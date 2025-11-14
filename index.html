@@ -2,7 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Молекулярная Симуляция</title>
     <style>
         * {
@@ -57,6 +59,13 @@
             z-index: 10;
             max-width: 320px;
             border: 2px solid #e0e0e0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        #controls.minimized {
+            transform: translateX(calc(100% + 20px));
+            opacity: 0;
+            pointer-events: none;
         }
 
         h2 {
@@ -165,6 +174,13 @@
             border: 1px solid #e0e0e0;
             max-width: 300px;
             z-index: 10;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .gesture-hint.minimized {
+            transform: translateX(calc(-100% - 20px));
+            opacity: 0;
+            pointer-events: none;
         }
 
         .gesture-hint strong {
@@ -201,6 +217,199 @@
             border-radius: 2px;
             transition: height 0.1s;
         }
+
+        /* Кнопки сворачивания панелей */
+        .toggle-btn {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #e0e0e0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 11;
+            font-size: 18px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .toggle-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: scale(1.1);
+        }
+
+        #toggleHints {
+            top: 20px;
+            left: 20px;
+        }
+
+        #toggleControls {
+            top: 20px;
+            right: 20px;
+        }
+
+        .toggle-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Кнопка закрытия панели */
+        .close-panel {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            background: rgba(0, 0, 0, 0.1);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            color: #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .close-panel:hover {
+            background: rgba(0, 0, 0, 0.2);
+            color: #333;
+        }
+
+        /* Адаптация для мобильных устройств */
+        @media (max-width: 768px) {
+            #controls {
+                top: 10px;
+                right: 10px;
+                padding: 12px;
+                max-width: 220px;
+                font-size: 11px;
+                background: rgba(255, 255, 255, 0.85); /* Чуть прозрачнее */
+            }
+
+            h2 {
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+
+            .control-group {
+                margin-bottom: 10px;
+            }
+
+            label {
+                font-size: 10px;
+            }
+
+            button {
+                padding: 8px;
+                font-size: 11px;
+                margin-top: 6px;
+            }
+
+            .gesture-hint {
+                top: 10px;
+                left: 10px;
+                padding: 10px 12px;
+                font-size: 11px;
+                max-width: 200px;
+                background: rgba(255, 255, 255, 0.85); /* Чуть прозрачнее */
+            }
+
+            .toggle-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 16px;
+            }
+
+            #toggleHints {
+                top: 10px;
+                left: 10px;
+            }
+
+            #toggleControls {
+                top: 10px;
+                right: 10px;
+            }
+
+            .gesture-hint strong {
+                margin-bottom: 5px;
+                font-size: 12px;
+            }
+
+            .gesture-hint div {
+                line-height: 1.4;
+                margin-bottom: 2px;
+            }
+
+            #status {
+                bottom: 10px;
+                left: 10px;
+                padding: 8px 12px;
+                font-size: 10px;
+            }
+
+            .audio-indicator {
+                bottom: 10px;
+                right: 10px;
+                width: 100px;
+                height: 30px;
+            }
+
+            .value-display {
+                font-size: 11px;
+            }
+        }
+
+        /* Для очень маленьких экранов (смартфоны) */
+        @media (max-width: 480px) {
+            #controls {
+                max-width: 180px;
+                padding: 10px;
+            }
+
+            .gesture-hint {
+                font-size: 9px;
+                max-width: 160px;
+                padding: 8px 10px;
+            }
+
+            .gesture-hint div {
+                line-height: 1.3;
+            }
+
+            h2 {
+                font-size: 12px;
+            }
+
+            button {
+                padding: 6px;
+                font-size: 10px;
+            }
+
+            #status {
+                font-size: 9px;
+                padding: 6px 10px;
+            }
+        }
+
+        /* Ландшафтная ориентация на мобильных */
+        @media (max-width: 900px) and (orientation: landscape) {
+            .gesture-hint {
+                max-width: 180px;
+                font-size: 10px;
+            }
+
+            #controls {
+                max-width: 200px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -208,10 +417,11 @@
         <video id="videoElement" autoplay playsinline></video>
         <canvas id="canvas"></canvas>
 
-        <div class="gesture-hint">
+        <div class="gesture-hint" id="gestureHint">
+            <button class="close-panel" id="closeHints" title="Скрыть подсказки">×</button>
             <strong>Жесты:</strong>
             <div>✌️ Щипок → создать молекулу</div>
-            <div>✌️✌️ Двойной щипок → изменить размер</div>
+            <div>✌️ Ширина щипка → изменить размер</div>
             <div>✋ Ладонь → захватить/двигать</div>
             <div>✋✋ Две ладони → растянуть</div>
             <div>✊ Кулак → зафиксировать позицию</div>
@@ -221,7 +431,10 @@
             <div>🎤 Звук деформирует контур</div>
         </div>
 
+        <div class="toggle-btn" id="toggleHints" title="Показать подсказки">💡</div>
+
         <div id="controls">
+            <button class="close-panel" id="closeControls" title="Скрыть панель">×</button>
             <h2>Параметры</h2>
 
             <div class="control-group">
@@ -253,6 +466,8 @@
             <button id="clearBtn">Очистить все</button>
         </div>
 
+        <div class="toggle-btn" id="toggleControls" title="Показать панель">⚙️</div>
+
         <div class="audio-indicator">
             <div class="audio-bars" id="audioBars"></div>
         </div>
@@ -281,6 +496,10 @@
         let previousPinchStates = [false, false];
         let audioLevel = 0;
         let audioFrequencyData = [];
+
+        // Сглаживание жестов - храним историю последних 5 кадров
+        const GESTURE_HISTORY_SIZE = 5;
+        let gestureHistory = []; // Массив из последних N состояний рук
 
         let config = {
             moleculeSize: 100,
@@ -377,8 +596,8 @@
                 // Это предотвращает обновление targetStretch во время перехода от открытых рук к кулакам
 
                 // Два кулака одновременно - фиксация формы
-                // НЕ требуем isGrabbed, так как молекула может отпуститься в промежуточном кадре
-                if (fistCount === 2) {
+                // Используем СГЛАЖЕННУЮ детекцию для надёжности
+                if (fistCount === 2 && checkStableTwoHands('isFist')) {
                     const fist1 = fists[0];
                     const fist2 = fists[1];
 
@@ -390,9 +609,8 @@
                     const fistDistance = Math.sqrt((fist1.x - fist2.x) ** 2 + (fist1.y - fist2.y) ** 2);
 
                     // Проверяем что молекула находится между кулаками или рядом с ними
-                    // Используем более мягкое условие: сумма расстояний не сильно больше расстояния между кулаками
                     const sumDist = dist1 + dist2;
-                    const isNearFists = sumDist < fistDistance + 100; // Молекула между кулаками или близко
+                    const isNearFists = sumDist < fistDistance + 120; // Молекула между кулаками или близко
 
                     if (isNearFists && (dist1 < 200 || dist2 < 200)) {
                         // Фиксируем ТЕКУЩИЕ значения (уже интерполированные!)
@@ -423,26 +641,26 @@
                     }
                 }
 
-                // Двойной щипок - изменение размера молекулы
+                // Одиночный щипок - изменение размера по ширине щипка
                 const pinchingHands = hands.filter(h => h.isPinching && !h.isFist);
-                if (fistCount === 0 && pinchingHands.length === 2) {
-                    const pinch1 = pinchingHands[0];
-                    const pinch2 = pinchingHands[1];
+                if (fistCount === 0 && pinchingHands.length === 1) {
+                    const pinch = pinchingHands[0];
+                    const distToMol = Math.sqrt((this.x - pinch.x) ** 2 + (this.y - pinch.y) ** 2);
 
-                    const centerX = (pinch1.x + pinch2.x) / 2;
-                    const centerY = (pinch1.y + pinch2.y) / 2;
-                    const distToCenter = Math.sqrt((this.x - centerX) ** 2 + (this.y - centerY) ** 2);
+                    // Если щипок близко к молекуле
+                    if (distToMol < 120) {
+                        // Ширина щипка определяет размер (pinchDist в диапазоне 0-0.15)
+                        // Маппим 0.01-0.15 на 50-300
+                        const normalizedDist = Math.max(0.01, Math.min(0.15, pinch.pinchDist));
+                        const newSize = 50 + ((normalizedDist - 0.01) / 0.14) * 250;
+                        this.targetSize = Math.round(newSize);
 
-                    // Если обе руки с щипком близко к молекуле
-                    if (distToCenter < 150) {
-                        // Расстояние между руками определяет размер
-                        const distance = Math.sqrt((pinch1.x - pinch2.x) ** 2 + (pinch1.y - pinch2.y) ** 2);
+                        // Отмечаем что молекула захвачена для изменения размера
+                        this.isGrabbed = true;
+                        this.targetX = pinch.x;
+                        this.targetY = pinch.y;
 
-                        // Размер пропорционален расстоянию между руками (50-300)
-                        const newSize = Math.max(50, Math.min(300, distance * 0.8));
-                        this.targetSize = newSize;
-
-                        // НЕ обрабатываем другие жесты, чтобы не мешать изменению размера
+                        // НЕ обрабатываем другие жесты
                         return;
                     }
                 }
@@ -688,6 +906,31 @@
             ctx.stroke();
         }
 
+        // Сглаживание жестов - проверяем что жест стабилен в последних N кадрах
+        function getStableGesture(handIndex, gestureName) {
+            if (gestureHistory.length < GESTURE_HISTORY_SIZE) {
+                return false; // Недостаточно истории
+            }
+
+            // Проверяем что в последних N кадрах жест был консистентным
+            let consistentCount = 0;
+            for (let i = 0; i < GESTURE_HISTORY_SIZE; i++) {
+                const frame = gestureHistory[gestureHistory.length - 1 - i];
+                if (frame && frame[handIndex] && frame[handIndex][gestureName]) {
+                    consistentCount++;
+                }
+            }
+
+            // Требуем минимум 4 из 5 кадров для стабильности
+            return consistentCount >= 4;
+        }
+
+        // Проверка стабильного состояния для обеих рук
+        function checkStableTwoHands(gestureName) {
+            if (hands.length !== 2) return false;
+            return getStableGesture(0, gestureName) && getStableGesture(1, gestureName);
+        }
+
         // Определение жестов
         function getPinchDistance(landmarks) {
             const thumb = landmarks[4];
@@ -799,6 +1042,7 @@
         // Обработка результатов MediaPipe
         function onResults(results) {
             const newHands = [];
+            const currentFrame = [];
 
             if (results.multiHandLandmarks) {
                 results.multiHandLandmarks.forEach((landmarks, idx) => {
@@ -812,14 +1056,18 @@
                     const isFist = isHandFist(landmarks);
                     const isCrossed = isFingersCrossed(landmarks);
 
-                    newHands.push({
+                    const handData = {
                         x: handX,
                         y: handY,
                         isPinching,
                         isOpen,
                         isFist,
-                        isCrossed
-                    });
+                        isCrossed,
+                        pinchDist // Сохраняем для изменения размера
+                    };
+
+                    newHands.push(handData);
+                    currentFrame.push(handData);
 
                     // Создание молекулы при щипке (но НЕ при кулаке!)
                     if (isPinching && !isFist && !previousPinchStates[idx]) {
@@ -835,6 +1083,12 @@
             }
 
             hands = newHands;
+
+            // Добавляем текущий кадр в историю
+            gestureHistory.push(currentFrame);
+            if (gestureHistory.length > GESTURE_HISTORY_SIZE) {
+                gestureHistory.shift(); // Удаляем старые кадры
+            }
         }
 
         // Инициализация MediaPipe Hands
@@ -856,8 +1110,22 @@
         // Инициализация камеры
         async function setupCamera() {
             try {
+                // Определяем мобильное устройство
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+                // Параметры видео для разных устройств
+                const videoConstraints = isMobile ? {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user' // Фронтальная камера для жестов
+                } : {
+                    width: 1280,
+                    height: 720,
+                    facingMode: 'user'
+                };
+
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 1280, height: 720, facingMode: 'user' }
+                    video: videoConstraints
                 });
                 video.srcObject = stream;
                 return new Promise((resolve) => {
@@ -865,7 +1133,19 @@
                 });
             } catch (error) {
                 console.error('Ошибка доступа к камере:', error);
-                return null;
+                // Пробуем с более простыми параметрами
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: true
+                    });
+                    video.srcObject = stream;
+                    return new Promise((resolve) => {
+                        video.onloadedmetadata = () => resolve(video);
+                    });
+                } catch (fallbackError) {
+                    console.error('Не удалось получить доступ к камере:', fallbackError);
+                    return null;
+                }
             }
         }
 
@@ -1056,6 +1336,47 @@
             molecules = [];
         });
 
+        // UI сворачивание/разворачивание панелей
+        const gestureHint = document.getElementById('gestureHint');
+        const controlsPanel = document.getElementById('controls');
+        const toggleHintsBtn = document.getElementById('toggleHints');
+        const toggleControlsBtn = document.getElementById('toggleControls');
+        const closeHintsBtn = document.getElementById('closeHints');
+        const closeControlsBtn = document.getElementById('closeControls');
+
+        // Скрыть подсказки
+        closeHintsBtn.addEventListener('click', () => {
+            gestureHint.classList.add('minimized');
+            toggleHintsBtn.classList.add('visible');
+        });
+
+        // Показать подсказки
+        toggleHintsBtn.addEventListener('click', () => {
+            gestureHint.classList.remove('minimized');
+            toggleHintsBtn.classList.remove('visible');
+        });
+
+        // Скрыть панель управления
+        closeControlsBtn.addEventListener('click', () => {
+            controlsPanel.classList.add('minimized');
+            toggleControlsBtn.classList.add('visible');
+        });
+
+        // Показать панель управления
+        toggleControlsBtn.addEventListener('click', () => {
+            controlsPanel.classList.remove('minimized');
+            toggleControlsBtn.classList.remove('visible');
+        });
+
+        // Автоматическое скрытие подсказок на мобильных через 10 секунд
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile) {
+            setTimeout(() => {
+                gestureHint.classList.add('minimized');
+                toggleHintsBtn.classList.add('visible');
+            }, 10000); // 10 секунд
+        }
+
         // Инициализация
         async function init() {
             resize();
@@ -1070,7 +1391,7 @@
 
             if (camera && audio) {
                 loading.style.display = 'none';
-                status.textContent = 'Готово! ✌️ = создать | ✌️✌️ = размер | ✋✋ = растянуть | ✊✊ = зафиксировать | 🤞 = удалить';
+                status.textContent = 'Готово! ✌️ = создать | ✌️ (ширина) = размер | ✋✋ = растянуть | ✊✊ = зафиксировать | 🤞 = удалить';
                 detectHands();
             } else {
                 loading.style.display = 'none';

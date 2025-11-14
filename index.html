@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Молекулярная Симуляция</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #videoElement {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transform: scaleX(-1);
+            transition: opacity 0.3s;
+            z-index: 1;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+            max-width: 320px;
+            border: 2px solid #e0e0e0;
+        }
+
+        h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 5px;
+            color: #666;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .value-display {
+            display: inline-block;
+            margin-left: 10px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background: #333;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #555;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .checkbox-group input {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            cursor: pointer;
+            color: #333;
+        }
+
+        #status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #333;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e0e0e0;
+            z-index: 10;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #333;
+            text-align: center;
+            z-index: 100;
+        }
+
+        .gesture-hint {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #333;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e0e0e0;
+            max-width: 300px;
+            z-index: 10;
+        }
+
+        .gesture-hint strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #000;
+        }
+
+        .audio-indicator {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 150px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e0e0e0;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        .audio-bars {
+            display: flex;
+            align-items: flex-end;
+            height: 100%;
+            padding: 5px;
+            gap: 2px;
+        }
+
+        .audio-bar {
+            flex: 1;
+            background: #333;
+            border-radius: 2px;
+            transition: height 0.1s;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <video id="videoElement" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+
+        <div class="gesture-hint">
+            <strong>Жесты:</strong>
+            <div>✌️ Щипок → создать молекулу</div>
+            <div>✋ Ладонь → захватить/двигать</div>
+            <div>✋✋ Две ладони → растянуть</div>
+            <div>✊ Кулак → отпустить/зафиксировать</div>
+            <div>🎤 Звук деформирует контур</div>
+        </div>
+
+        <div id="controls">
+            <h2>Параметры</h2>
+
+            <div class="control-group">
+                <label>Размер молекулы: <span class="value-display" id="molSize">100</span></label>
+                <input type="range" id="molSizeSlider" min="50" max="300" value="100" step="10">
+            </div>
+
+            <div class="control-group">
+                <label>Сила слияния: <span class="value-display" id="mergeStrength">1.5</span></label>
+                <input type="range" id="mergeSlider" min="0.5" max="3" value="1.5" step="0.1">
+            </div>
+
+            <div class="control-group">
+                <label>Звуковая реакция: <span class="value-display" id="audioSens">20</span></label>
+                <input type="range" id="audioSensSlider" min="5" max="50" value="20" step="5">
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="audioEnabled" checked>
+                <label for="audioEnabled">Звук влияет на форму</label>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="showVideo">
+                <label for="showVideo">Показать видео</label>
+            </div>
+
+            <button id="unlockBtn">Разблокировать все</button>
+            <button id="clearBtn">Очистить все</button>
+        </div>
+
+        <div class="audio-indicator">
+            <div class="audio-bars" id="audioBars"></div>
+        </div>
+
+        <div id="status">Загрузка...</div>
+        <div class="loading" id="loading">
+            <div>Инициализация...</div>
+            <div style="font-size: 14px; margin-top: 10px;">Разрешите доступ к камере и микрофону</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+    <script>
+        // Основные переменные
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('videoElement');
+        const loading = document.getElementById('loading');
+        const status = document.getElementById('status');
+
+        let width, height;
+        let molecules = [];
+        let hands = [];
+        let previousPinchStates = [false, false];
+        let audioLevel = 0;
+        let audioFrequencyData = [];
+
+        let config = {
+            moleculeSize: 100,
+            mergeStrength: 1.5,
+            audioSensitivity: 20,
+            audioEnabled: true,
+            showVideo: false
+        };
+
+        // Аудио контекст
+        let audioContext = null;
+        let analyser = null;
+        let microphone = null;
+        let dataArray = null;
+
+        // Параметры метаболлов
+        const gridResolution = 15; // Разрешение сетки для marching squares
+
+        // Класс молекулы (метабол)
+        class Molecule {
+            constructor(x, y, size) {
+                this.x = x;
+                this.y = y;
+                this.baseSize = size;
+                this.size = size;
+                this.vx = 0;
+                this.vy = 0;
+                this.targetX = x;
+                this.targetY = y;
+
+                // Деформация от рук
+                this.stretchX = 1;
+                this.stretchY = 1;
+                this.targetStretchX = 1;
+                this.targetStretchY = 1;
+
+                // Для звуковых эффектов
+                this.audioPhase = Math.random() * Math.PI * 2;
+                this.creationAudioLevel = audioLevel;
+
+                // Состояние захвата
+                this.isGrabbed = false;
+                this.isLocked = false; // Зафиксирована кулаком
+            }
+
+            update() {
+                // Плавное движение к цели
+                this.x += (this.targetX - this.x) * 0.1;
+                this.y += (this.targetY - this.y) * 0.1;
+
+                // Плавная деформация
+                this.stretchX += (this.targetStretchX - this.stretchX) * 0.1;
+                this.stretchY += (this.targetStretchY - this.stretchY) * 0.1;
+
+                // Обновляем фазу для звука
+                this.audioPhase += 0.05;
+
+                // Если молекула заблокирована - не реагируем на руки
+                if (this.isLocked) {
+                    this.isGrabbed = false;
+                    return;
+                }
+
+                // Проверяем есть ли кулаки - если да, фиксируем молекулу
+                const hasFist = hands.some(h => h.isFist);
+                if (hasFist && this.isGrabbed) {
+                    this.isLocked = true;
+                    this.isGrabbed = false;
+                    this.targetStretchX = 1;
+                    this.targetStretchY = 1;
+                    return;
+                }
+
+                // Открытые ладони
+                const openHands = hands.filter(h => h.isOpen && !h.isPinching);
+
+                if (openHands.length === 2) {
+                    // Две руки - растягиваем молекулу
+                    const hand1 = openHands[0];
+                    const hand2 = openHands[1];
+
+                    const centerX = (hand1.x + hand2.x) / 2;
+                    const centerY = (hand1.y + hand2.y) / 2;
+                    const distToCenter = Math.sqrt((this.x - centerX) ** 2 + (this.y - centerY) ** 2);
+
+                    if (distToCenter < 200 || this.isGrabbed) {
+                        this.isGrabbed = true;
+                        this.targetX = centerX;
+                        this.targetY = centerY;
+
+                        // Растяжение в направлении между руками
+                        const distance = Math.sqrt((hand1.x - hand2.x) ** 2 + (hand1.y - hand2.y) ** 2);
+                        const angle = Math.atan2(hand2.y - hand1.y, hand2.x - hand1.x);
+                        const stretch = Math.min(distance / 200, 3);
+
+                        this.targetStretchX = 1 + Math.abs(Math.cos(angle)) * (stretch - 1);
+                        this.targetStretchY = 1 + Math.abs(Math.sin(angle)) * (stretch - 1);
+                    } else {
+                        this.isGrabbed = false;
+                        this.targetStretchX = 1;
+                        this.targetStretchY = 1;
+                    }
+                } else if (openHands.length === 1) {
+                    // Одна рука - захватываем и двигаем молекулу
+                    const hand = openHands[0];
+                    const dist = Math.sqrt((this.x - hand.x) ** 2 + (this.y - hand.y) ** 2);
+
+                    if (dist < 120 || this.isGrabbed) {
+                        this.isGrabbed = true;
+                        this.targetX = hand.x;
+                        this.targetY = hand.y;
+                    } else {
+                        this.isGrabbed = false;
+                    }
+
+                    this.targetStretchX = 1;
+                    this.targetStretchY = 1;
+                } else {
+                    // Нет открытых рук - отпускаем
+                    this.isGrabbed = false;
+                    this.targetStretchX = 1;
+                    this.targetStretchY = 1;
+                }
+
+                // Границы экрана
+                const margin = this.size * 2;
+                this.targetX = Math.max(margin, Math.min(width - margin, this.targetX));
+                this.targetY = Math.max(margin, Math.min(height - margin, this.targetY));
+            }
+
+            // Разблокировать молекулу (для UI)
+            unlock() {
+                this.isLocked = false;
+            }
+
+            // Функция влияния для метаболлов
+            getInfluence(px, py) {
+                const dx = (px - this.x) / this.stretchX;
+                const dy = (py - this.y) / this.stretchY;
+                const distSq = dx * dx + dy * dy;
+
+                // Добавляем звуковую модуляцию
+                let audioMod = 1;
+                if (config.audioEnabled) {
+                    const angle = Math.atan2(dy, dx);
+                    audioMod = 1 + Math.sin(angle * 3 + this.audioPhase) * audioLevel * config.audioSensitivity * 0.02;
+                }
+
+                const effectiveSize = this.size * audioMod;
+                const radiusSq = effectiveSize * effectiveSize;
+
+                if (distSq > radiusSq * 4) return 0;
+
+                // Smooth kernel для метаболлов
+                return (radiusSq / (distSq + radiusSq)) * config.mergeStrength;
+            }
+        }
+
+        // Инициализация аудио
+        async function setupAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(stream);
+
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+
+                microphone.connect(analyser);
+
+                // Создаем визуализацию
+                const audioBars = document.getElementById('audioBars');
+                for (let i = 0; i < 10; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'audio-bar';
+                    audioBars.appendChild(bar);
+                }
+
+                return true;
+            } catch (error) {
+                console.error('Ошибка доступа к микрофону:', error);
+                return false;
+            }
+        }
+
+        // Анализ аудио
+        function analyzeAudio() {
+            if (!analyser || !dataArray) return;
+
+            analyser.getByteFrequencyData(dataArray);
+
+            // Средний уровень
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            audioLevel = (sum / dataArray.length) / 255;
+
+            // Обновляем визуализацию
+            const bars = document.querySelectorAll('.audio-bar');
+            bars.forEach((bar, i) => {
+                const value = dataArray[i * Math.floor(dataArray.length / bars.length)] / 255;
+                bar.style.height = `${value * 100}%`;
+            });
+        }
+
+        // Рисование метаболлов через marching squares
+        function drawMetaballs() {
+            if (molecules.length === 0) return;
+
+            // Создаем сетку значений потенциала
+            const cols = Math.ceil(width / gridResolution) + 1;
+            const rows = Math.ceil(height / gridResolution) + 1;
+            const field = [];
+
+            // Вычисляем поле влияния
+            for (let i = 0; i < rows; i++) {
+                field[i] = [];
+                for (let j = 0; j < cols; j++) {
+                    const x = j * gridResolution;
+                    const y = i * gridResolution;
+                    let sum = 0;
+
+                    // Суммируем влияние всех молекул
+                    for (const mol of molecules) {
+                        sum += mol.getInfluence(x, y);
+                    }
+
+                    field[i][j] = sum;
+                }
+            }
+
+            // Marching squares
+            ctx.fillStyle = '#f5f5f5';
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 2.5;
+
+            const threshold = 1.0;
+
+            for (let i = 0; i < rows - 1; i++) {
+                for (let j = 0; j < cols - 1; j++) {
+                    const x = j * gridResolution;
+                    const y = i * gridResolution;
+
+                    const tl = field[i][j] >= threshold ? 1 : 0;
+                    const tr = field[i][j + 1] >= threshold ? 1 : 0;
+                    const br = field[i + 1][j + 1] >= threshold ? 1 : 0;
+                    const bl = field[i + 1][j] >= threshold ? 1 : 0;
+
+                    const cellIndex = tl * 8 + tr * 4 + br * 2 + bl * 1;
+
+                    if (cellIndex === 0 || cellIndex === 15) continue;
+
+                    // Рисуем контур для этой ячейки
+                    drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold);
+                }
+            }
+        }
+
+        // Отрисовка одной ячейки marching squares
+        function drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold) {
+            const size = gridResolution;
+
+            // Интерполяция позиций на гранях
+            function lerp(v0, v1, t) {
+                return v0 + t * (v1 - v0);
+            }
+
+            function getEdgePoint(edge) {
+                const tl = field[i][j];
+                const tr = field[i][j + 1];
+                const br = field[i + 1][j + 1];
+                const bl = field[i + 1][j];
+
+                let t = 0.5; // По умолчанию середина
+
+                switch(edge) {
+                    case 0: // Верх
+                        t = (threshold - tl) / (tr - tl);
+                        return { x: lerp(x, x + size, t), y: y };
+                    case 1: // Право
+                        t = (threshold - tr) / (br - tr);
+                        return { x: x + size, y: lerp(y, y + size, t) };
+                    case 2: // Низ
+                        t = (threshold - bl) / (br - bl);
+                        return { x: lerp(x, x + size, t), y: y + size };
+                    case 3: // Лево
+                        t = (threshold - tl) / (bl - tl);
+                        return { x: x, y: lerp(y, y + size, t) };
+                }
+            }
+
+            // Линии для разных конфигураций marching squares
+            const lines = {
+                1: [[3, 2]], 2: [[1, 2]], 3: [[3, 1]],
+                4: [[0, 1]], 5: [[0, 3], [1, 2]], 6: [[0, 2]],
+                7: [[0, 3]], 8: [[0, 3]], 9: [[0, 2]],
+                10: [[0, 1], [3, 2]], 11: [[0, 1]], 12: [[3, 1]],
+                13: [[1, 2]], 14: [[3, 2]]
+            };
+
+            if (!lines[cellIndex]) return;
+
+            ctx.beginPath();
+            for (const [e1, e2] of lines[cellIndex]) {
+                const p1 = getEdgePoint(e1);
+                const p2 = getEdgePoint(e2);
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+            }
+            ctx.stroke();
+        }
+
+        // Определение жестов
+        function getPinchDistance(landmarks) {
+            const thumb = landmarks[4];
+            const index = landmarks[8];
+            const dx = thumb.x - index.x;
+            const dy = thumb.y - index.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function isHandOpen(landmarks) {
+            // Проверяем расстояния между кончиками пальцев и ладонью
+            const palm = landmarks[0];
+            const fingerTips = [landmarks[4], landmarks[8], landmarks[12], landmarks[16], landmarks[20]];
+
+            let openCount = 0;
+            fingerTips.forEach(tip => {
+                const dist = Math.sqrt((tip.x - palm.x) ** 2 + (tip.y - palm.y) ** 2);
+                if (dist > 0.15) openCount++;
+            });
+
+            return openCount >= 3; // Минимум 3 пальца открыты
+        }
+
+        function isHandFist(landmarks) {
+            // Проверяем что пальцы согнуты - кончики близко к основаниям пальцев
+            const fingerPairs = [
+                [landmarks[8], landmarks[5]],   // Указательный: кончик и основание
+                [landmarks[12], landmarks[9]],  // Средний: кончик и основание
+                [landmarks[16], landmarks[13]], // Безымянный: кончик и основание
+                [landmarks[20], landmarks[17]]  // Мизинец: кончик и основание
+            ];
+
+            let closedCount = 0;
+            fingerPairs.forEach(([tip, base]) => {
+                const dist = Math.sqrt((tip.x - base.x) ** 2 + (tip.y - base.y) ** 2);
+                // Если кончик близко к основанию - палец согнут
+                if (dist < 0.08) closedCount++;
+            });
+
+            // Большой палец - проверяем что он близко к ладони
+            const thumbTip = landmarks[4];
+            const palmCenter = landmarks[9];
+            const thumbDist = Math.sqrt((thumbTip.x - palmCenter.x) ** 2 + (thumbTip.y - palmCenter.y) ** 2);
+
+            // Кулак = минимум 3 пальца согнуты И большой палец близко
+            return closedCount >= 3 && thumbDist < 0.15;
+        }
+
+        // Обработка результатов MediaPipe
+        let fistDebugTimer = 0;
+        function onResults(results) {
+            const newHands = [];
+
+            if (results.multiHandLandmarks) {
+                results.multiHandLandmarks.forEach((landmarks, idx) => {
+                    const palm = landmarks[9];
+                    const handX = (1 - palm.x) * width;
+                    const handY = palm.y * height;
+
+                    const pinchDist = getPinchDistance(landmarks);
+                    const isPinching = pinchDist < 0.05;
+                    const isOpen = isHandOpen(landmarks);
+                    const isFist = isHandFist(landmarks);
+
+                    // Отладка для кулака (раз в 30 кадров = ~1 раз в секунду)
+                    if (isFist && fistDebugTimer++ % 30 === 0) {
+                        console.log('Кулак детектирован!');
+                    }
+
+                    newHands.push({
+                        x: handX,
+                        y: handY,
+                        isPinching,
+                        isOpen,
+                        isFist
+                    });
+
+                    // Создание молекулы при щипке
+                    if (isPinching && !previousPinchStates[idx]) {
+                        molecules.push(new Molecule(
+                            handX,
+                            handY,
+                            config.moleculeSize
+                        ));
+                    }
+
+                    previousPinchStates[idx] = isPinching;
+                });
+            }
+
+            hands = newHands;
+        }
+
+        // Инициализация MediaPipe Hands
+        const handsDetector = new Hands({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }
+        });
+
+        handsDetector.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
+        });
+
+        handsDetector.onResults(onResults);
+
+        // Инициализация камеры
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720, facingMode: 'user' }
+                });
+                video.srcObject = stream;
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => resolve(video);
+                });
+            } catch (error) {
+                console.error('Ошибка доступа к камере:', error);
+                return null;
+            }
+        }
+
+        // Инициализация размеров
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        // Основной цикл анимации
+        function animate() {
+            // Белый фон (если видео не показывается, иначе прозрачный)
+            if (!config.showVideo) {
+                ctx.fillStyle = '#f5f5f5';
+                ctx.fillRect(0, 0, width, height);
+            } else {
+                // Очищаем canvas для прозрачности
+                ctx.clearRect(0, 0, width, height);
+            }
+
+            // Анализируем звук
+            if (config.audioEnabled) {
+                analyzeAudio();
+            }
+
+            // Обновление молекул
+            molecules.forEach(mol => mol.update());
+
+            // Рисование метаболлов
+            drawMetaballs();
+
+            // Визуализация захваченных/заблокированных молекул
+            molecules.forEach(mol => {
+                if (mol.isLocked) {
+                    // Красный крестик для заблокированных
+                    ctx.strokeStyle = 'rgba(255, 50, 50, 0.7)';
+                    ctx.lineWidth = 3;
+                    const size = 15;
+                    ctx.beginPath();
+                    ctx.moveTo(mol.x - size, mol.y - size);
+                    ctx.lineTo(mol.x + size, mol.y + size);
+                    ctx.moveTo(mol.x + size, mol.y - size);
+                    ctx.lineTo(mol.x - size, mol.y + size);
+                    ctx.stroke();
+                } else if (mol.isGrabbed) {
+                    // Зелёный круг для захваченных
+                    ctx.strokeStyle = 'rgba(50, 255, 50, 0.8)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(mol.x, mol.y, 25, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            });
+
+            // Визуализация рук
+            hands.forEach(hand => {
+                let color, label;
+                if (hand.isPinching) {
+                    color = 'rgba(255, 100, 100, 0.6)';
+                    label = '✌️';
+                } else if (hand.isFist) {
+                    color = 'rgba(255, 150, 50, 0.6)';
+                    label = '✊';
+                } else if (hand.isOpen) {
+                    color = 'rgba(100, 255, 100, 0.6)';
+                    label = '✋';
+                } else {
+                    color = 'rgba(150, 150, 150, 0.5)';
+                    label = '';
+                }
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(hand.x, hand.y, 15, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#1a1a1a';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Emoji для жеста
+                if (label) {
+                    ctx.font = '20px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(label, hand.x, hand.y - 35);
+                }
+            });
+
+            // Линия между двумя руками
+            const openHands = hands.filter(h => h.isOpen);
+            if (openHands.length === 2) {
+                ctx.strokeStyle = 'rgba(100, 255, 100, 0.4)';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(openHands[0].x, openHands[0].y);
+                ctx.lineTo(openHands[1].x, openHands[1].y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Обработка видео для MediaPipe
+        async function detectHands() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                await handsDetector.send({ image: video });
+            }
+            requestAnimationFrame(detectHands);
+        }
+
+        // UI контролы
+        document.getElementById('molSizeSlider').addEventListener('input', (e) => {
+            config.moleculeSize = parseInt(e.target.value);
+            document.getElementById('molSize').textContent = config.moleculeSize;
+        });
+
+        document.getElementById('mergeSlider').addEventListener('input', (e) => {
+            config.mergeStrength = parseFloat(e.target.value);
+            document.getElementById('mergeStrength').textContent = config.mergeStrength.toFixed(1);
+        });
+
+        document.getElementById('audioSensSlider').addEventListener('input', (e) => {
+            config.audioSensitivity = parseInt(e.target.value);
+            document.getElementById('audioSens').textContent = config.audioSensitivity;
+        });
+
+        document.getElementById('audioEnabled').addEventListener('change', (e) => {
+            config.audioEnabled = e.target.checked;
+        });
+
+        document.getElementById('showVideo').addEventListener('change', (e) => {
+            config.showVideo = e.target.checked;
+            const newOpacity = config.showVideo ? '0.3' : '0';
+            video.style.opacity = newOpacity;
+            console.log('Видео:', config.showVideo ? 'показано (opacity: 0.3)' : 'скрыто (opacity: 0)');
+        });
+
+        document.getElementById('unlockBtn').addEventListener('click', () => {
+            molecules.forEach(mol => mol.unlock());
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            molecules = [];
+        });
+
+        // Инициализация
+        async function init() {
+            resize();
+            window.addEventListener('resize', resize);
+
+            animate();
+
+            const [camera, audio] = await Promise.all([
+                setupCamera(),
+                setupAudio()
+            ]);
+
+            if (camera && audio) {
+                loading.style.display = 'none';
+                status.textContent = 'Готово! Щипок = создать | Ладонь = захватить | Кулак = зафиксировать';
+                detectHands();
+            } else {
+                loading.style.display = 'none';
+                status.textContent = camera ? 'Работает без звука' : 'Работает без камеры';
+                if (camera) detectHands();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

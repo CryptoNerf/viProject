@@ -211,9 +211,13 @@
         <div class="gesture-hint">
             <strong>Жесты:</strong>
             <div>✌️ Щипок → создать молекулу</div>
+            <div>✌️✌️ Двойной щипок → изменить размер</div>
             <div>✋ Ладонь → захватить/двигать</div>
             <div>✋✋ Две ладони → растянуть</div>
-            <div>✊ Кулак → отпустить/зафиксировать</div>
+            <div>✊ Кулак → зафиксировать позицию</div>
+            <div>✊✊ Два кулака → зафиксировать форму</div>
+            <div>✋ (на крестике) → разблокировать</div>
+            <div>🤞 Скрещенные пальцы → удалить</div>
             <div>🎤 Звук деформирует контур</div>
         </div>
 
@@ -302,6 +306,7 @@
                 this.y = y;
                 this.baseSize = size;
                 this.size = size;
+                this.targetSize = size;  // Целевой размер для плавного изменения
                 this.vx = 0;
                 this.vy = 0;
                 this.targetX = x;
@@ -319,41 +324,131 @@
 
                 // Состояние захвата
                 this.isGrabbed = false;
-                this.isLocked = false; // Зафиксирована кулаком
+                this.isLocked = false; // Зафиксирована позиция
+                this.isShapeLocked = false; // Зафиксирована форма (растяжение)
             }
 
             update() {
-                // Плавное движение к цели
-                this.x += (this.targetX - this.x) * 0.1;
-                this.y += (this.targetY - this.y) * 0.1;
+                // Плавное движение к цели (если не заблокирована)
+                if (!this.isLocked) {
+                    this.x += (this.targetX - this.x) * 0.1;
+                    this.y += (this.targetY - this.y) * 0.1;
+                }
 
-                // Плавная деформация
-                this.stretchX += (this.targetStretchX - this.stretchX) * 0.1;
-                this.stretchY += (this.targetStretchY - this.stretchY) * 0.1;
+                // Плавная деформация (если форма не заблокирована)
+                if (!this.isShapeLocked) {
+                    this.stretchX += (this.targetStretchX - this.stretchX) * 0.1;
+                    this.stretchY += (this.targetStretchY - this.stretchY) * 0.1;
+                }
+
+                // Плавное изменение размера
+                this.size += (this.targetSize - this.size) * 0.1;
 
                 // Обновляем фазу для звука
                 this.audioPhase += 0.05;
 
-                // Если молекула заблокирована - не реагируем на руки
+                // Подсчитываем жесты
+                const fists = hands.filter(h => h.isFist);
+                const fistCount = fists.length;
+                const openHands = hands.filter(h => h.isOpen && !h.isPinching);
+
+                // Проверяем разблокировку: открытая ладонь близко к заблокированной молекуле
+                if (this.isLocked && openHands.length === 1 && fistCount === 0) {
+                    const hand = openHands[0];
+                    const distToHand = Math.sqrt((this.x - hand.x) ** 2 + (this.y - hand.y) ** 2);
+
+                    if (distToHand < 100) {
+                        // Разблокировать молекулу
+                        this.isLocked = false;
+                        this.isShapeLocked = false;
+                        this.targetStretchX = 1;
+                        this.targetStretchY = 1;
+                        return;
+                    }
+                }
+
+                // Если молекула заблокирована - не реагируем на другие жесты
                 if (this.isLocked) {
                     this.isGrabbed = false;
                     return;
                 }
 
-                // Проверяем есть ли кулаки - если да, фиксируем молекулу
-                const hasFist = hands.some(h => h.isFist);
-                if (hasFist && this.isGrabbed) {
-                    this.isLocked = true;
-                    this.isGrabbed = false;
-                    this.targetStretchX = 1;
-                    this.targetStretchY = 1;
-                    return;
+                // ВАЖНО: Проверяем кулаки ПЕРЕД обработкой открытых рук!
+                // Это предотвращает обновление targetStretch во время перехода от открытых рук к кулакам
+
+                // Два кулака одновременно - фиксация формы
+                // НЕ требуем isGrabbed, так как молекула может отпуститься в промежуточном кадре
+                if (fistCount === 2) {
+                    const fist1 = fists[0];
+                    const fist2 = fists[1];
+
+                    // Расстояния от молекулы до кулаков
+                    const dist1 = Math.sqrt((this.x - fist1.x) ** 2 + (this.y - fist1.y) ** 2);
+                    const dist2 = Math.sqrt((this.x - fist2.x) ** 2 + (this.y - fist2.y) ** 2);
+
+                    // Расстояние между кулаками
+                    const fistDistance = Math.sqrt((fist1.x - fist2.x) ** 2 + (fist1.y - fist2.y) ** 2);
+
+                    // Проверяем что молекула находится между кулаками или рядом с ними
+                    // Используем более мягкое условие: сумма расстояний не сильно больше расстояния между кулаками
+                    const sumDist = dist1 + dist2;
+                    const isNearFists = sumDist < fistDistance + 100; // Молекула между кулаками или близко
+
+                    if (isNearFists && (dist1 < 200 || dist2 < 200)) {
+                        // Фиксируем ТЕКУЩИЕ значения (уже интерполированные!)
+                        // НЕ используем targetStretchX/Y, так как они могут быть "неправильными"
+                        this.targetStretchX = this.stretchX;
+                        this.targetStretchY = this.stretchY;
+
+                        // Фиксируем форму и позицию
+                        this.isLocked = true;
+                        this.isShapeLocked = true;
+                        this.isGrabbed = false;
+                        return;
+                    }
                 }
 
-                // Открытые ладони
-                const openHands = hands.filter(h => h.isOpen && !h.isPinching);
+                // Один кулак - фиксация позиции (сброс деформации)
+                if (fistCount === 1 && this.isGrabbed) {
+                    const fist = fists[0];
+                    const distToFist = Math.sqrt((this.x - fist.x) ** 2 + (this.y - fist.y) ** 2);
 
-                if (openHands.length === 2) {
+                    if (distToFist < 120) {
+                        this.isLocked = true;
+                        this.isGrabbed = false;
+                        // Сбрасываем деформацию
+                        this.targetStretchX = 1;
+                        this.targetStretchY = 1;
+                        return;
+                    }
+                }
+
+                // Двойной щипок - изменение размера молекулы
+                const pinchingHands = hands.filter(h => h.isPinching && !h.isFist);
+                if (fistCount === 0 && pinchingHands.length === 2) {
+                    const pinch1 = pinchingHands[0];
+                    const pinch2 = pinchingHands[1];
+
+                    const centerX = (pinch1.x + pinch2.x) / 2;
+                    const centerY = (pinch1.y + pinch2.y) / 2;
+                    const distToCenter = Math.sqrt((this.x - centerX) ** 2 + (this.y - centerY) ** 2);
+
+                    // Если обе руки с щипком близко к молекуле
+                    if (distToCenter < 150) {
+                        // Расстояние между руками определяет размер
+                        const distance = Math.sqrt((pinch1.x - pinch2.x) ** 2 + (pinch1.y - pinch2.y) ** 2);
+
+                        // Размер пропорционален расстоянию между руками (50-300)
+                        const newSize = Math.max(50, Math.min(300, distance * 0.8));
+                        this.targetSize = newSize;
+
+                        // НЕ обрабатываем другие жесты, чтобы не мешать изменению размера
+                        return;
+                    }
+                }
+
+                // Работа с открытыми ладонями для манипуляции (только если НЕТ кулаков)
+                if (fistCount === 0 && openHands.length === 2) {
                     // Две руки - растягиваем молекулу
                     const hand1 = openHands[0];
                     const hand2 = openHands[1];
@@ -379,8 +474,8 @@
                         this.targetStretchX = 1;
                         this.targetStretchY = 1;
                     }
-                } else if (openHands.length === 1) {
-                    // Одна рука - захватываем и двигаем молекулу
+                } else if (fistCount === 0 && openHands.length === 1) {
+                    // Одна рука - захватываем и двигаем молекулу (только если нет кулаков)
                     const hand = openHands[0];
                     const dist = Math.sqrt((this.x - hand.x) ** 2 + (this.y - hand.y) ** 2);
 
@@ -410,6 +505,7 @@
             // Разблокировать молекулу (для UI)
             unlock() {
                 this.isLocked = false;
+                this.isShapeLocked = false;
             }
 
             // Функция влияния для метаболлов
@@ -640,8 +736,67 @@
             return closedCount >= 3 && thumbDist < 0.15;
         }
 
+        function isFingersCrossed(landmarks) {
+            // Проверяем что указательный и средний пальцы скрещены
+            const indexTip = landmarks[8];     // Кончик указательного
+            const middleTip = landmarks[12];   // Кончик среднего
+            const ringTip = landmarks[16];     // Кончик безымянного
+            const pinkyTip = landmarks[20];    // Кончик мизинца
+            const palm = landmarks[0];          // Запястье
+            const indexBase = landmarks[5];    // Основание указательного
+            const middleBase = landmarks[9];   // Основание среднего
+
+            // Расстояние между кончиками указательного и среднего пальцев
+            const fingersDist = Math.sqrt(
+                (indexTip.x - middleTip.x) ** 2 +
+                (indexTip.y - middleTip.y) ** 2
+            );
+
+            // Проверяем что пальцы вытянуты (далеко от ладони)
+            const indexFromPalm = Math.sqrt(
+                (indexTip.x - palm.x) ** 2 +
+                (indexTip.y - palm.y) ** 2
+            );
+            const middleFromPalm = Math.sqrt(
+                (middleTip.x - palm.x) ** 2 +
+                (middleTip.y - palm.y) ** 2
+            );
+
+            // Проверяем что указательный и средний НЕ согнуты (не кулак)
+            const indexNotClosed = Math.sqrt(
+                (indexTip.x - indexBase.x) ** 2 +
+                (indexTip.y - indexBase.y) ** 2
+            ) > 0.08;
+            const middleNotClosed = Math.sqrt(
+                (middleTip.x - middleBase.x) ** 2 +
+                (middleTip.y - middleBase.y) ** 2
+            ) > 0.08;
+
+            // Проверяем что безымянный и мизинец тоже вытянуты (не согнуты как в кулаке)
+            const ringFromPalm = Math.sqrt(
+                (ringTip.x - palm.x) ** 2 +
+                (ringTip.y - palm.y) ** 2
+            );
+            const pinkyFromPalm = Math.sqrt(
+                (pinkyTip.x - palm.x) ** 2 +
+                (pinkyTip.y - palm.y) ** 2
+            );
+
+            // Скрещены если:
+            // 1. Указательный и средний ОЧЕНЬ близко друг к другу
+            // 2. Оба ХОРОШО вытянуты от ладони
+            // 3. Пальцы НЕ согнуты (не кулак)
+            // 4. Безымянный и мизинец тоже вытянуты (не кулак)
+            return fingersDist < 0.03 &&           // УЖЕСТОЧЕНО: было 0.04
+                   indexFromPalm > 0.18 &&          // УЖЕСТОЧЕНО: было 0.15
+                   middleFromPalm > 0.18 &&         // УЖЕСТОЧЕНО: было 0.15
+                   indexNotClosed &&
+                   middleNotClosed &&
+                   ringFromPalm > 0.14 &&           // УЖЕСТОЧЕНО: было 0.12
+                   pinkyFromPalm > 0.12;            // УЖЕСТОЧЕНО: было 0.1
+        }
+
         // Обработка результатов MediaPipe
-        let fistDebugTimer = 0;
         function onResults(results) {
             const newHands = [];
 
@@ -655,22 +810,19 @@
                     const isPinching = pinchDist < 0.05;
                     const isOpen = isHandOpen(landmarks);
                     const isFist = isHandFist(landmarks);
-
-                    // Отладка для кулака (раз в 30 кадров = ~1 раз в секунду)
-                    if (isFist && fistDebugTimer++ % 30 === 0) {
-                        console.log('Кулак детектирован!');
-                    }
+                    const isCrossed = isFingersCrossed(landmarks);
 
                     newHands.push({
                         x: handX,
                         y: handY,
                         isPinching,
                         isOpen,
-                        isFist
+                        isFist,
+                        isCrossed
                     });
 
-                    // Создание молекулы при щипке
-                    if (isPinching && !previousPinchStates[idx]) {
+                    // Создание молекулы при щипке (но НЕ при кулаке!)
+                    if (isPinching && !isFist && !previousPinchStates[idx]) {
                         molecules.push(new Molecule(
                             handX,
                             handY,
@@ -742,22 +894,63 @@
             // Обновление молекул
             molecules.forEach(mol => mol.update());
 
+            // Удаление молекул жестом скрещенных пальцев
+            const crossedHands = hands.filter(h => h.isCrossed);
+            if (crossedHands.length > 0) {
+                molecules = molecules.filter(mol => {
+                    // Проверяем расстояние до каждой руки со скрещенными пальцами
+                    for (const hand of crossedHands) {
+                        const dist = Math.sqrt((mol.x - hand.x) ** 2 + (mol.y - hand.y) ** 2);
+                        if (dist < 80) {
+                            return false; // Удаляем молекулу
+                        }
+                    }
+                    return true; // Оставляем молекулу
+                });
+            }
+
             // Рисование метаболлов
             drawMetaballs();
 
             // Визуализация захваченных/заблокированных молекул
             molecules.forEach(mol => {
                 if (mol.isLocked) {
-                    // Красный крестик для заблокированных
-                    ctx.strokeStyle = 'rgba(255, 50, 50, 0.7)';
-                    ctx.lineWidth = 3;
-                    const size = 15;
-                    ctx.beginPath();
-                    ctx.moveTo(mol.x - size, mol.y - size);
-                    ctx.lineTo(mol.x + size, mol.y + size);
-                    ctx.moveTo(mol.x + size, mol.y - size);
-                    ctx.lineTo(mol.x - size, mol.y + size);
-                    ctx.stroke();
+                    if (mol.isShapeLocked) {
+                        // Двойной крестик для зафиксированной формы
+                        ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
+                        ctx.lineWidth = 3;
+                        const size = 15;
+
+                        // Внешний крестик
+                        ctx.beginPath();
+                        ctx.moveTo(mol.x - size, mol.y - size);
+                        ctx.lineTo(mol.x + size, mol.y + size);
+                        ctx.moveTo(mol.x + size, mol.y - size);
+                        ctx.lineTo(mol.x - size, mol.y + size);
+                        ctx.stroke();
+
+                        // Внутренний крестик
+                        ctx.strokeStyle = 'rgba(255, 150, 50, 0.6)';
+                        ctx.lineWidth = 2;
+                        const smallSize = 8;
+                        ctx.beginPath();
+                        ctx.moveTo(mol.x - smallSize, mol.y - smallSize);
+                        ctx.lineTo(mol.x + smallSize, mol.y + smallSize);
+                        ctx.moveTo(mol.x + smallSize, mol.y - smallSize);
+                        ctx.lineTo(mol.x - smallSize, mol.y + smallSize);
+                        ctx.stroke();
+                    } else {
+                        // Красный крестик для заблокированной позиции
+                        ctx.strokeStyle = 'rgba(255, 50, 50, 0.7)';
+                        ctx.lineWidth = 3;
+                        const size = 15;
+                        ctx.beginPath();
+                        ctx.moveTo(mol.x - size, mol.y - size);
+                        ctx.lineTo(mol.x + size, mol.y + size);
+                        ctx.moveTo(mol.x + size, mol.y - size);
+                        ctx.lineTo(mol.x - size, mol.y + size);
+                        ctx.stroke();
+                    }
                 } else if (mol.isGrabbed) {
                     // Зелёный круг для захваченных
                     ctx.strokeStyle = 'rgba(50, 255, 50, 0.8)';
@@ -771,7 +964,10 @@
             // Визуализация рук
             hands.forEach(hand => {
                 let color, label;
-                if (hand.isPinching) {
+                if (hand.isCrossed) {
+                    color = 'rgba(255, 50, 150, 0.7)';
+                    label = '🤞';
+                } else if (hand.isPinching) {
                     color = 'rgba(255, 100, 100, 0.6)';
                     label = '✌️';
                 } else if (hand.isFist) {
@@ -849,9 +1045,7 @@
 
         document.getElementById('showVideo').addEventListener('change', (e) => {
             config.showVideo = e.target.checked;
-            const newOpacity = config.showVideo ? '0.3' : '0';
-            video.style.opacity = newOpacity;
-            console.log('Видео:', config.showVideo ? 'показано (opacity: 0.3)' : 'скрыто (opacity: 0)');
+            video.style.opacity = config.showVideo ? '0.3' : '0';
         });
 
         document.getElementById('unlockBtn').addEventListener('click', () => {
@@ -876,7 +1070,7 @@
 
             if (camera && audio) {
                 loading.style.display = 'none';
-                status.textContent = 'Готово! Щипок = создать | Ладонь = захватить | Кулак = зафиксировать';
+                status.textContent = 'Готово! ✌️ = создать | ✌️✌️ = размер | ✋✋ = растянуть | ✊✊ = зафиксировать | 🤞 = удалить';
                 detectHands();
             } else {
                 loading.style.display = 'none';

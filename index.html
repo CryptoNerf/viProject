@@ -545,6 +545,7 @@
                 this.isGrabbed = false;
                 this.isLocked = false; // Зафиксирована позиция
                 this.isShapeLocked = false; // Зафиксирована форма (растяжение)
+                this.isEditing = false; // Режим редактирования
             }
 
             update() {
@@ -597,7 +598,8 @@
 
                 // Два кулака одновременно - фиксация формы
                 // Используем СГЛАЖЕННУЮ детекцию для надёжности
-                if (fistCount === 2 && checkStableTwoHands('isFist')) {
+                const twoFistsStable = checkStableTwoHands('isFist');
+                if (fistCount === 2 && twoFistsStable) {
                     const fist1 = fists[0];
                     const fist2 = fists[1];
 
@@ -610,9 +612,9 @@
 
                     // Проверяем что молекула находится между кулаками или рядом с ними
                     const sumDist = dist1 + dist2;
-                    const isNearFists = sumDist < fistDistance + 120; // Молекула между кулаками или близко
+                    const isNearFists = sumDist < fistDistance + 150; // Молекула между кулаками или близко
 
-                    if (isNearFists && (dist1 < 200 || dist2 < 200)) {
+                    if (isNearFists && (dist1 < 220 || dist2 < 220)) {
                         // Фиксируем ТЕКУЩИЕ значения (уже интерполированные!)
                         // НЕ используем targetStretchX/Y, так как они могут быть "неправильными"
                         this.targetStretchX = this.stretchX;
@@ -689,10 +691,9 @@
                         this.targetStretchY = 1 + Math.abs(Math.sin(angle)) * (stretch - 1);
                     } else {
                         this.isGrabbed = false;
-                        this.targetStretchX = 1;
-                        this.targetStretchY = 1;
+                        // НЕ сбрасываем растяжение сразу - даём время на фиксацию кулаками
                     }
-                } else if (fistCount === 0 && openHands.length === 1) {
+                } else if (openHands.length === 1 && fistCount === 0) {
                     // Одна рука - захватываем и двигаем молекулу (только если нет кулаков)
                     const hand = openHands[0];
                     const dist = Math.sqrt((this.x - hand.x) ** 2 + (this.y - hand.y) ** 2);
@@ -705,13 +706,27 @@
                         this.isGrabbed = false;
                     }
 
-                    this.targetStretchX = 1;
-                    this.targetStretchY = 1;
+                    // Сбрасываем растяжение ТОЛЬКО если молекула не была растянута
+                    // (защита от промежуточных состояний при переходе к кулакам)
+                    const isStretched = Math.abs(this.stretchX - 1) > 0.05 || Math.abs(this.stretchY - 1) > 0.05;
+                    if (!isStretched) {
+                        this.targetStretchX = 1;
+                        this.targetStretchY = 1;
+                    }
+                } else if (openHands.length === 1 && fistCount > 0) {
+                    // Одна открытая ладонь + кулаки - не трогаем растяжение
+                    // (переходное состояние к фиксации формы)
+                    this.isGrabbed = false;
                 } else {
                     // Нет открытых рук - отпускаем
                     this.isGrabbed = false;
-                    this.targetStretchX = 1;
-                    this.targetStretchY = 1;
+                    // Сбрасываем растяжение только если:
+                    // 1. Нет кулаков (не пытаемся зафиксировать форму)
+                    // 2. И нет вообще никаких рук поблизости (полностью отпустили)
+                    if (fistCount === 0 && hands.length === 0) {
+                        this.targetStretchX = 1;
+                        this.targetStretchY = 1;
+                    }
                 }
 
                 // Границы экрана
@@ -925,10 +940,26 @@
             return consistentCount >= 4;
         }
 
-        // Проверка стабильного состояния для обеих рук
+        // Проверка стабильного состояния для обеих рук (не привязываемся к индексу руки)
         function checkStableTwoHands(gestureName) {
             if (hands.length !== 2) return false;
-            return getStableGesture(0, gestureName) && getStableGesture(1, gestureName);
+            if (gestureHistory.length < 3) return false; // Уменьшаем требование
+
+            // Проверяем что в последних 3 кадрах было ровно 2 руки с нужным жестом
+            let consistentCount = 0;
+            for (let i = 0; i < Math.min(3, gestureHistory.length); i++) {
+                const frame = gestureHistory[gestureHistory.length - 1 - i];
+                if (frame && frame.length === 2) {
+                    // Считаем сколько рук имеют нужный жест в этом кадре
+                    const handsWithGesture = frame.filter(h => h[gestureName]).length;
+                    if (handsWithGesture === 2) {
+                        consistentCount++;
+                    }
+                }
+            }
+
+            // Требуем минимум 2 из 3 последних кадров
+            return consistentCount >= 2;
         }
 
         // Определение жестов

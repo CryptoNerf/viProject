@@ -421,14 +421,16 @@
             <button class="close-panel" id="closeHints" title="Скрыть подсказки">×</button>
             <strong>Жесты:</strong>
             <div>✌️ Щипок → создать молекулу</div>
-            <div>✌️ Ширина щипка → изменить размер</div>
-            <div>✋ Ладонь → захватить/двигать</div>
-            <div>✋✋ Две ладони → растянуть</div>
-            <div>✊ Кулак → зафиксировать позицию</div>
-            <div>✊✊ Два кулака → зафиксировать форму</div>
-            <div>✋ (на крестике) → разблокировать</div>
-            <div>🤞 Скрещенные пальцы → удалить</div>
-            <div>🎤 Звук деформирует контур</div>
+            <div>😮 Открыть рот → режим ✎</div>
+            <div>✋ Ладонь → двигать молекулу</div>
+            <div>✋ (в режиме ✎) → размер и форма</div>
+            <div style="font-size: 10px; margin-left: 10px;">↳ ширина ладони = размер</div>
+            <div style="font-size: 10px; margin-left: 10px;">↳ загнутые пальцы = форма</div>
+            <div>✊ Кулак 2 сек → фиксация молекулы</div>
+            <div>✊✊ Два кулака 2 сек → фиксация ВСЕХ</div>
+            <div>🤙 Мизинец → разблокировать</div>
+            <div>🤞 Скрещ. пальцы 2 сек → удалить</div>
+            <div>🎤 Звук → деформация контура</div>
         </div>
 
         <div class="toggle-btn" id="toggleHints" title="Показать подсказки">💡</div>
@@ -481,6 +483,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
 
     <script>
         // Основные переменные
@@ -496,10 +499,32 @@
         let previousPinchStates = [false, false];
         let audioLevel = 0;
         let audioFrequencyData = [];
+        let isMouthOpen = false; // Текущее состояние рта
+        let wasMouthOpen = false; // Предыдущее состояние рта для детекции открытия
+        let editingMolecule = null; // Молекула в режиме редактирования
 
         // Сглаживание жестов - храним историю последних 5 кадров
         const GESTURE_HISTORY_SIZE = 5;
         let gestureHistory = []; // Массив из последних N состояний рук
+
+        // УЛУЧШЕНО: Индивидуальная стабильность для каждого типа жеста
+        const GESTURE_STABILITY = {
+            pinch: { required: 4, history: [] },      // Щипок - требует 4 из 5 кадров (УЛУЧШЕНО: было 3)
+            pinky: { required: 3, history: [] },      // Мизинец - требует 3 из 5
+            crossed: { required: 4, history: [] },    // Скрещенные - требует 4 из 5
+            fist: { required: 3, history: [] },       // Кулак - требует 3 из 5
+            open: { required: 2, history: [] }        // Открытая ладонь - требует 2 из 5 (мягче)
+        };
+
+        // Таймеры для фиксации и удаления
+        const HOLD_DURATION = 2000; // 2 секунды в миллисекундах
+        const RESET_TOLERANCE = 300; // Толерантность перед сбросом таймера (мс)
+        let fistHoldStart = null; // Время начала удержания одного кулака на молекуле
+        let twoFistsHoldStart = null; // Время начала удержания двух кулаков
+        let fistHoldMolecule = null; // Молекула, над которой удерживается кулак
+        let crossedHoldStart = null; // Время начала удержания скрещенных пальцев
+        let crossedHoldMolecule = null; // Молекула, которую хотят удалить
+        let crossedHoldLostTime = null; // Время когда жест был потерян
 
         let config = {
             moleculeSize: 100,
@@ -567,166 +592,97 @@
                 // Обновляем фазу для звука
                 this.audioPhase += 0.05;
 
-                // Подсчитываем жесты
-                const fists = hands.filter(h => h.isFist);
-                const fistCount = fists.length;
-                const openHands = hands.filter(h => h.isOpen && !h.isPinching);
-
-                // Проверяем разблокировку: открытая ладонь близко к заблокированной молекуле
-                if (this.isLocked && openHands.length === 1 && fistCount === 0) {
-                    const hand = openHands[0];
-                    const distToHand = Math.sqrt((this.x - hand.x) ** 2 + (this.y - hand.y) ** 2);
-
-                    if (distToHand < 100) {
-                        // Разблокировать молекулу
-                        this.isLocked = false;
-                        this.isShapeLocked = false;
-                        this.targetStretchX = 1;
-                        this.targetStretchY = 1;
-                        return;
-                    }
-                }
-
-                // Если молекула заблокирована - не реагируем на другие жесты
+                // Если молекула заблокирована - не реагируем на жесты
                 if (this.isLocked) {
                     this.isGrabbed = false;
                     return;
                 }
 
-                // ВАЖНО: Проверяем кулаки ПЕРЕД обработкой открытых рук!
-                // Это предотвращает обновление targetStretch во время перехода от открытых рук к кулакам
+                // Фильтруем руки
+                const openHands = hands.filter(h => h.isOpen && !h.isPinching && !h.isFist);
 
-                // Два кулака одновременно - фиксация формы
-                // Используем СГЛАЖЕННУЮ детекцию для надёжности
-                const twoFistsStable = checkStableTwoHands('isFist');
-                if (fistCount === 2 && twoFistsStable) {
-                    const fist1 = fists[0];
-                    const fist2 = fists[1];
+                if (this.isEditing) {
+                    // РЕЖИМ РЕДАКТИРОВАНИЯ - управление двумя руками
+                    if (openHands.length === 2) {
+                        const hand1 = openHands[0];
+                        const hand2 = openHands[1];
 
-                    // Расстояния от молекулы до кулаков
-                    const dist1 = Math.sqrt((this.x - fist1.x) ** 2 + (this.y - fist1.y) ** 2);
-                    const dist2 = Math.sqrt((this.x - fist2.x) ** 2 + (this.y - fist2.y) ** 2);
+                        // Проверяем что хотя бы одна рука близко к молекуле
+                        const dist1 = Math.sqrt((this.x - hand1.x) ** 2 + (this.y - hand1.y) ** 2);
+                        const dist2 = Math.sqrt((this.x - hand2.x) ** 2 + (this.y - hand2.y) ** 2);
 
-                    // Расстояние между кулаками
-                    const fistDistance = Math.sqrt((fist1.x - fist2.x) ** 2 + (fist1.y - fist2.y) ** 2);
+                        if (dist1 < 200 || dist2 < 200) {
+                            this.isGrabbed = true;
 
-                    // Проверяем что молекула находится между кулаками или рядом с ними
-                    const sumDist = dist1 + dist2;
-                    const isNearFists = sumDist < fistDistance + 150; // Молекула между кулаками или близко
+                            // Центр между двумя руками
+                            const centerX = (hand1.x + hand2.x) / 2;
+                            const centerY = (hand1.y + hand2.y) / 2;
 
-                    if (isNearFists && (dist1 < 220 || dist2 < 220)) {
-                        // Фиксируем ТЕКУЩИЕ значения (уже интерполированные!)
-                        // НЕ используем targetStretchX/Y, так как они могут быть "неправильными"
-                        this.targetStretchX = this.stretchX;
-                        this.targetStretchY = this.stretchY;
+                            this.targetX = centerX;
+                            this.targetY = centerY;
 
-                        // Фиксируем форму и позицию
-                        this.isLocked = true;
-                        this.isShapeLocked = true;
-                        this.isGrabbed = false;
-                        return;
-                    }
-                }
+                            // УПРАВЛЕНИЕ РАЗМЕРОМ - средняя ширина ладоней
+                            const avgHandWidth = (hand1.handWidth + hand2.handWidth) / 2;
+                            const newSize = Math.max(30, Math.min(400, avgHandWidth * 500));
+                            this.targetSize = newSize;
 
-                // Один кулак - фиксация позиции (сброс деформации)
-                if (fistCount === 1 && this.isGrabbed) {
-                    const fist = fists[0];
-                    const distToFist = Math.sqrt((this.x - fist.x) ** 2 + (this.y - fist.y) ** 2);
+                            // УПРАВЛЕНИЕ ФОРМОЙ - расстояние между руками
+                            const handsDistX = Math.abs(hand2.x - hand1.x);
+                            const handsDistY = Math.abs(hand2.y - hand1.y);
 
-                    if (distToFist < 120) {
-                        this.isLocked = true;
-                        this.isGrabbed = false;
-                        // Сбрасываем деформацию
-                        this.targetStretchX = 1;
-                        this.targetStretchY = 1;
-                        return;
-                    }
-                }
+                            // Растяжение по горизонтали зависит от горизонтального расстояния между руками
+                            // Базовое расстояние ~ 200px = круглая форма (1.0)
+                            // Больше расстояние → больше растяжение
+                            // Меньше расстояние → сжатие
+                            const baseDistX = 200;
+                            this.targetStretchX = Math.max(0.3, Math.min(3.0, handsDistX / baseDistX));
 
-                // Одиночный щипок - изменение размера по ширине щипка
-                const pinchingHands = hands.filter(h => h.isPinching && !h.isFist);
-                if (fistCount === 0 && pinchingHands.length === 1) {
-                    const pinch = pinchingHands[0];
-                    const distToMol = Math.sqrt((this.x - pinch.x) ** 2 + (this.y - pinch.y) ** 2);
+                            // Растяжение по вертикали зависит от вертикального расстояния
+                            const baseDistY = 200;
+                            this.targetStretchY = Math.max(0.3, Math.min(3.0, handsDistY / baseDistY));
+                        } else {
+                            this.isGrabbed = false;
+                        }
+                    } else if (openHands.length === 1) {
+                        // Одна рука - только перемещение и размер
+                        const hand = openHands[0];
+                        const dist = Math.sqrt((this.x - hand.x) ** 2 + (this.y - hand.y) ** 2);
 
-                    // Если щипок близко к молекуле
-                    if (distToMol < 120) {
-                        // Ширина щипка определяет размер (pinchDist в диапазоне 0-0.15)
-                        // Маппим 0.01-0.15 на 50-300
-                        const normalizedDist = Math.max(0.01, Math.min(0.15, pinch.pinchDist));
-                        const newSize = 50 + ((normalizedDist - 0.01) / 0.14) * 250;
-                        this.targetSize = Math.round(newSize);
+                        if (dist < 150) {
+                            this.isGrabbed = true;
+                            this.targetX = hand.x;
+                            this.targetY = hand.y;
 
-                        // Отмечаем что молекула захвачена для изменения размера
-                        this.isGrabbed = true;
-                        this.targetX = pinch.x;
-                        this.targetY = pinch.y;
+                            // Ширина раскрытия ладони определяет размер
+                            const newSize = Math.max(30, Math.min(400, hand.handWidth * 500));
+                            this.targetSize = newSize;
 
-                        // НЕ обрабатываем другие жесты
-                        return;
-                    }
-                }
-
-                // Работа с открытыми ладонями для манипуляции (только если НЕТ кулаков)
-                if (fistCount === 0 && openHands.length === 2) {
-                    // Две руки - растягиваем молекулу
-                    const hand1 = openHands[0];
-                    const hand2 = openHands[1];
-
-                    const centerX = (hand1.x + hand2.x) / 2;
-                    const centerY = (hand1.y + hand2.y) / 2;
-                    const distToCenter = Math.sqrt((this.x - centerX) ** 2 + (this.y - centerY) ** 2);
-
-                    if (distToCenter < 200 || this.isGrabbed) {
-                        this.isGrabbed = true;
-                        this.targetX = centerX;
-                        this.targetY = centerY;
-
-                        // Растяжение в направлении между руками
-                        const distance = Math.sqrt((hand1.x - hand2.x) ** 2 + (hand1.y - hand2.y) ** 2);
-                        const angle = Math.atan2(hand2.y - hand1.y, hand2.x - hand1.x);
-                        const stretch = Math.min(distance / 200, 3);
-
-                        this.targetStretchX = 1 + Math.abs(Math.cos(angle)) * (stretch - 1);
-                        this.targetStretchY = 1 + Math.abs(Math.sin(angle)) * (stretch - 1);
+                            // Форма не меняется одной рукой
+                        } else {
+                            this.isGrabbed = false;
+                        }
                     } else {
                         this.isGrabbed = false;
-                        // НЕ сбрасываем растяжение сразу - даём время на фиксацию кулаками
                     }
-                } else if (openHands.length === 1 && fistCount === 0) {
-                    // Одна рука - захватываем и двигаем молекулу (только если нет кулаков)
+                } else if (!this.isEditing && openHands.length === 1) {
+                    // ОБЫЧНЫЙ РЕЖИМ - только перемещение ладонью
                     const hand = openHands[0];
                     const dist = Math.sqrt((this.x - hand.x) ** 2 + (this.y - hand.y) ** 2);
 
-                    if (dist < 120 || this.isGrabbed) {
+                    if (dist < 120) {
                         this.isGrabbed = true;
                         this.targetX = hand.x;
                         this.targetY = hand.y;
+
+                        // Сбрасываем растяжение в обычном режиме
+                        this.targetStretchX = 1;
+                        this.targetStretchY = 1;
                     } else {
                         this.isGrabbed = false;
                     }
-
-                    // Сбрасываем растяжение ТОЛЬКО если молекула не была растянута
-                    // (защита от промежуточных состояний при переходе к кулакам)
-                    const isStretched = Math.abs(this.stretchX - 1) > 0.05 || Math.abs(this.stretchY - 1) > 0.05;
-                    if (!isStretched) {
-                        this.targetStretchX = 1;
-                        this.targetStretchY = 1;
-                    }
-                } else if (openHands.length === 1 && fistCount > 0) {
-                    // Одна открытая ладонь + кулаки - не трогаем растяжение
-                    // (переходное состояние к фиксации формы)
-                    this.isGrabbed = false;
                 } else {
-                    // Нет открытых рук - отпускаем
+                    // Нет подходящих рук - отпускаем
                     this.isGrabbed = false;
-                    // Сбрасываем растяжение только если:
-                    // 1. Нет кулаков (не пытаемся зафиксировать форму)
-                    // 2. И нет вообще никаких рук поблизости (полностью отпустили)
-                    if (fistCount === 0 && hands.length === 0) {
-                        this.targetStretchX = 1;
-                        this.targetStretchY = 1;
-                    }
                 }
 
                 // Границы экрана
@@ -766,8 +722,12 @@
 
         // Инициализация аудио
         async function setupAudio() {
+            console.log('Начинаем инициализацию аудио...');
             try {
+                console.log('Запрашиваем доступ к микрофону...');
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log('Доступ к микрофону получен!', stream);
+
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioContext.createAnalyser();
                 microphone = audioContext.createMediaStreamSource(stream);
@@ -786,9 +746,12 @@
                     audioBars.appendChild(bar);
                 }
 
+                console.log('Аудио инициализировано успешно');
                 return true;
             } catch (error) {
                 console.error('Ошибка доступа к микрофону:', error);
+                console.error('Имя ошибки:', error.name);
+                console.error('Сообщение:', error.message);
                 return false;
             }
         }
@@ -971,62 +934,266 @@
             return Math.sqrt(dx * dx + dy * dy);
         }
 
-        function isHandOpen(landmarks) {
-            // Проверяем расстояния между кончиками пальцев и ладонью
-            const palm = landmarks[0];
-            const fingerTips = [landmarks[4], landmarks[8], landmarks[12], landmarks[16], landmarks[20]];
+        // НОВОЕ: Улучшенная детекция щипка - проверяем что это именно щипок, а не начало кулака
+        function isPinching(landmarks) {
+            const pinchDist = getPinchDistance(landmarks);
 
-            let openCount = 0;
-            fingerTips.forEach(tip => {
-                const dist = Math.sqrt((tip.x - palm.x) ** 2 + (tip.y - palm.y) ** 2);
-                if (dist > 0.15) openCount++;
+            // Основной критерий - большой и указательный пальцы близко
+            if (pinchDist >= 0.05) return false;
+
+            // ВАЖНО: Проверяем что другие пальцы НЕ сжаты в кулак
+            // При настоящем щипке средний, безымянный и мизинец должны быть относительно открыты
+            const palmCenter = landmarks[9];
+            const middleTip = landmarks[12];
+            const ringTip = landmarks[16];
+            const pinkyTip = landmarks[20];
+
+            // Расстояния других пальцев от центра ладони
+            const middleFromPalm = Math.sqrt(
+                (middleTip.x - palmCenter.x) ** 2 +
+                (middleTip.y - palmCenter.y) ** 2
+            );
+            const ringFromPalm = Math.sqrt(
+                (ringTip.x - palmCenter.x) ** 2 +
+                (ringTip.y - palmCenter.y) ** 2
+            );
+            const pinkyFromPalm = Math.sqrt(
+                (pinkyTip.x - palmCenter.x) ** 2 +
+                (pinkyTip.y - palmCenter.y) ** 2
+            );
+
+            // Считаем сколько пальцев относительно открыты
+            // Если палец далеко от ладони - он открыт
+            let openFingersCount = 0;
+            if (middleFromPalm > 0.10) openFingersCount++;
+            if (ringFromPalm > 0.09) openFingersCount++;
+            if (pinkyFromPalm > 0.08) openFingersCount++;
+
+            // Для щипка минимум 2 из 3 пальцев должны быть открыты
+            // Это предотвращает ложное срабатывание при формировании кулака
+            return openFingersCount >= 2;
+        }
+
+        // НОВОЕ: Улучшенная детекция загнутых пальцев для режима редактирования
+        function detectFoldedFingers(landmarks) {
+            const palmCenter = landmarks[9];
+            const palm = landmarks[0];
+
+            // Для каждого пальца проверяем:
+            // 1. Расстояние кончика от основания (прямая проверка сгиба)
+            // 2. Расстояние кончика от центра ладони (относительная проверка)
+            // 3. Комбинированное решение для точности
+
+            // БОЛЬШОЙ ПАЛЕЦ
+            const thumbTip = landmarks[4];
+            const thumbBase = landmarks[2];
+            const thumbLength = Math.sqrt(
+                (thumbTip.x - thumbBase.x) ** 2 +
+                (thumbTip.y - thumbBase.y) ** 2
+            );
+            const thumbToPalm = Math.sqrt(
+                (thumbTip.x - palmCenter.x) ** 2 +
+                (thumbTip.y - palmCenter.y) ** 2
+            );
+            const thumbFolded = thumbLength < 0.065 || thumbToPalm < 0.11;
+
+            // УКАЗАТЕЛЬНЫЙ ПАЛЕЦ
+            const indexTip = landmarks[8];
+            const indexBase = landmarks[5];
+            const indexMid = landmarks[6];
+            const indexLength = Math.sqrt(
+                (indexTip.x - indexBase.x) ** 2 +
+                (indexTip.y - indexBase.y) ** 2
+            );
+            const indexToPalm = Math.sqrt(
+                (indexTip.x - palmCenter.x) ** 2 +
+                (indexTip.y - palmCenter.y) ** 2
+            );
+            // Проверяем угол сгиба через среднюю фалангу
+            const indexBend = Math.sqrt(
+                (indexTip.x - indexMid.x) ** 2 +
+                (indexTip.y - indexMid.y) ** 2
+            );
+            const indexFolded = (indexLength < 0.09 && indexToPalm < 0.14) || indexBend < 0.05;
+
+            // СРЕДНИЙ ПАЛЕЦ
+            const middleTip = landmarks[12];
+            const middleBase = landmarks[9];
+            const middleMid = landmarks[10];
+            const middleLength = Math.sqrt(
+                (middleTip.x - middleBase.x) ** 2 +
+                (middleTip.y - middleBase.y) ** 2
+            );
+            const middleToPalm = Math.sqrt(
+                (middleTip.x - palmCenter.x) ** 2 +
+                (middleTip.y - palmCenter.y) ** 2
+            );
+            const middleBend = Math.sqrt(
+                (middleTip.x - middleMid.x) ** 2 +
+                (middleTip.y - middleMid.y) ** 2
+            );
+            const middleFolded = (middleLength < 0.10 && middleToPalm < 0.14) || middleBend < 0.05;
+
+            // БЕЗЫМЯННЫЙ ПАЛЕЦ
+            const ringTip = landmarks[16];
+            const ringBase = landmarks[13];
+            const ringMid = landmarks[14];
+            const ringLength = Math.sqrt(
+                (ringTip.x - ringBase.x) ** 2 +
+                (ringTip.y - ringBase.y) ** 2
+            );
+            const ringToPalm = Math.sqrt(
+                (ringTip.x - palmCenter.x) ** 2 +
+                (ringTip.y - palmCenter.y) ** 2
+            );
+            const ringBend = Math.sqrt(
+                (ringTip.x - ringMid.x) ** 2 +
+                (ringTip.y - ringMid.y) ** 2
+            );
+            const ringFolded = (ringLength < 0.09 && ringToPalm < 0.13) || ringBend < 0.05;
+
+            // МИЗИНЕЦ
+            const pinkyTip = landmarks[20];
+            const pinkyBase = landmarks[17];
+            const pinkyMid = landmarks[18];
+            const pinkyLength = Math.sqrt(
+                (pinkyTip.x - pinkyBase.x) ** 2 +
+                (pinkyTip.y - pinkyBase.y) ** 2
+            );
+            const pinkyToPalm = Math.sqrt(
+                (pinkyTip.x - palmCenter.x) ** 2 +
+                (pinkyTip.y - palmCenter.y) ** 2
+            );
+            const pinkyBend = Math.sqrt(
+                (pinkyTip.x - pinkyMid.x) ** 2 +
+                (pinkyTip.y - pinkyMid.y) ** 2
+            );
+            const pinkyFolded = (pinkyLength < 0.07 && pinkyToPalm < 0.12) || pinkyBend < 0.04;
+
+            return {
+                thumb: thumbFolded,
+                index: indexFolded,
+                middle: middleFolded,
+                ring: ringFolded,
+                pinky: pinkyFolded
+            };
+        }
+
+        function isHandOpen(landmarks) {
+            // УЛУЧШЕНО: Более точная проверка открытой ладони
+            const palm = landmarks[0];
+            const palmCenter = landmarks[9];
+
+            // Проверяем расстояния кончиков пальцев от центра ладони
+            const fingerTips = [
+                { tip: landmarks[8], base: landmarks[5], name: 'index' },    // Указательный
+                { tip: landmarks[12], base: landmarks[9], name: 'middle' },  // Средний
+                { tip: landmarks[16], base: landmarks[13], name: 'ring' },   // Безымянный
+                { tip: landmarks[20], base: landmarks[17], name: 'pinky' }   // Мизинец
+            ];
+
+            let extendedCount = 0;
+            fingerTips.forEach(finger => {
+                // Проверяем что палец вытянут (кончик далеко от основания)
+                const tipToBase = Math.sqrt(
+                    (finger.tip.x - finger.base.x) ** 2 +
+                    (finger.tip.y - finger.base.y) ** 2
+                );
+
+                // И палец далеко от центра ладони
+                const tipToPalm = Math.sqrt(
+                    (finger.tip.x - palmCenter.x) ** 2 +
+                    (finger.tip.y - palmCenter.y) ** 2
+                );
+
+                // Палец считается открытым если он вытянут И далеко от ладони
+                if (tipToBase > 0.07 && tipToPalm > 0.13) {
+                    extendedCount++;
+                }
             });
 
-            return openCount >= 3; // Минимум 3 пальца открыты
+            // Проверяем большой палец отдельно
+            const thumbTip = landmarks[4];
+            const thumbBase = landmarks[2];
+            const thumbExtended = Math.sqrt(
+                (thumbTip.x - thumbBase.x) ** 2 +
+                (thumbTip.y - thumbBase.y) ** 2
+            ) > 0.06;
+
+            // Ладонь открыта если минимум 3 пальца (не считая большой) вытянуты
+            // ИЛИ все 4 пальца + большой вытянуты
+            return extendedCount >= 3 || (extendedCount >= 2 && thumbExtended);
         }
 
         function isHandFist(landmarks) {
-            // Проверяем что пальцы согнуты - кончики близко к основаниям пальцев
+            // УЛУЧШЕНО: Более точная проверка кулака
+            const palmCenter = landmarks[9];
+            const palm = landmarks[0];
+
             const fingerPairs = [
-                [landmarks[8], landmarks[5]],   // Указательный: кончик и основание
-                [landmarks[12], landmarks[9]],  // Средний: кончик и основание
-                [landmarks[16], landmarks[13]], // Безымянный: кончик и основание
-                [landmarks[20], landmarks[17]]  // Мизинец: кончик и основание
+                { tip: landmarks[8], base: landmarks[5], name: 'index' },    // Указательный
+                { tip: landmarks[12], base: landmarks[9], name: 'middle' },  // Средний
+                { tip: landmarks[16], base: landmarks[13], name: 'ring' },   // Безымянный
+                { tip: landmarks[20], base: landmarks[17], name: 'pinky' }   // Мизинец
             ];
 
             let closedCount = 0;
-            fingerPairs.forEach(([tip, base]) => {
-                const dist = Math.sqrt((tip.x - base.x) ** 2 + (tip.y - base.y) ** 2);
-                // Если кончик близко к основанию - палец согнут
-                if (dist < 0.08) closedCount++;
+            fingerPairs.forEach(finger => {
+                // Проверяем что кончик близко к основанию (палец согнут)
+                const tipToBase = Math.sqrt(
+                    (finger.tip.x - finger.base.x) ** 2 +
+                    (finger.tip.y - finger.base.y) ** 2
+                );
+
+                // И кончик НЕ далеко от ладони
+                const tipToPalm = Math.sqrt(
+                    (finger.tip.x - palmCenter.x) ** 2 +
+                    (finger.tip.y - palmCenter.y) ** 2
+                );
+
+                // Палец считается закрытым если расстояние кончик-основание мало
+                // И кончик близко к центру ладони
+                if (tipToBase < 0.09 && tipToPalm < 0.15) {
+                    closedCount++;
+                }
             });
 
-            // Большой палец - проверяем что он близко к ладони
+            // Большой палец - проверяем что он близко к ладони или согнут
             const thumbTip = landmarks[4];
-            const palmCenter = landmarks[9];
-            const thumbDist = Math.sqrt((thumbTip.x - palmCenter.x) ** 2 + (thumbTip.y - palmCenter.y) ** 2);
+            const thumbBase = landmarks[2];
+            const thumbToPalm = Math.sqrt(
+                (thumbTip.x - palmCenter.x) ** 2 +
+                (thumbTip.y - palmCenter.y) ** 2
+            );
+            const thumbClosed = thumbToPalm < 0.13;
 
-            // Кулак = минимум 3 пальца согнуты И большой палец близко
-            return closedCount >= 3 && thumbDist < 0.15;
+            // УЛУЧШЕНО: Кулак = минимум 3 пальца согнуты И большой палец тоже согнут
+            // Также проверяем что это не щипок (thumb и index не слишком близко)
+            const thumbIndexDist = Math.sqrt(
+                (thumbTip.x - landmarks[8].x) ** 2 +
+                (thumbTip.y - landmarks[8].y) ** 2
+            );
+            const notPinching = thumbIndexDist > 0.06; // Не щипок
+
+            return closedCount >= 3 && thumbClosed && notPinching;
         }
 
         function isFingersCrossed(landmarks) {
-            // Проверяем что указательный и средний пальцы скрещены
-            const indexTip = landmarks[8];     // Кончик указательного
-            const middleTip = landmarks[12];   // Кончик среднего
-            const ringTip = landmarks[16];     // Кончик безымянного
-            const pinkyTip = landmarks[20];    // Кончик мизинца
-            const palm = landmarks[0];          // Запястье
-            const indexBase = landmarks[5];    // Основание указательного
-            const middleBase = landmarks[9];   // Основание среднего
+            // УЛУЧШЕНО v5: Баланс между точностью и детектируемостью
+            const indexTip = landmarks[8];
+            const middleTip = landmarks[12];
+            const palm = landmarks[0];
+            const palmCenter = landmarks[9];
+            const indexBase = landmarks[5];
+            const middleBase = landmarks[9];
 
-            // Расстояние между кончиками указательного и среднего пальцев
+            // 1. КЛЮЧЕВОЙ КРИТЕРИЙ: Пальцы близко друг к другу
             const fingersDist = Math.sqrt(
                 (indexTip.x - middleTip.x) ** 2 +
                 (indexTip.y - middleTip.y) ** 2
             );
 
-            // Проверяем что пальцы вытянуты (далеко от ладони)
+            // 2. Оба пальца вытянуты от ладони
             const indexFromPalm = Math.sqrt(
                 (indexTip.x - palm.x) ** 2 +
                 (indexTip.y - palm.y) ** 2
@@ -1036,44 +1203,241 @@
                 (middleTip.y - palm.y) ** 2
             );
 
-            // Проверяем что указательный и средний НЕ согнуты (не кулак)
-            const indexNotClosed = Math.sqrt(
+            // 3. Проверяем что пальцы вытянуты
+            const indexLength = Math.sqrt(
                 (indexTip.x - indexBase.x) ** 2 +
                 (indexTip.y - indexBase.y) ** 2
-            ) > 0.08;
-            const middleNotClosed = Math.sqrt(
+            );
+            const middleLength = Math.sqrt(
                 (middleTip.x - middleBase.x) ** 2 +
                 (middleTip.y - middleBase.y) ** 2
-            ) > 0.08;
-
-            // Проверяем что безымянный и мизинец тоже вытянуты (не согнуты как в кулаке)
-            const ringFromPalm = Math.sqrt(
-                (ringTip.x - palm.x) ** 2 +
-                (ringTip.y - palm.y) ** 2
             );
+
+            // 4. Не щипок
+            const thumbTip = landmarks[4];
+            const thumbIndexDist = Math.sqrt(
+                (thumbTip.x - indexTip.x) ** 2 +
+                (thumbTip.y - indexTip.y) ** 2
+            );
+
+            // 5. Не кулак
+            const thumbToPalm = Math.sqrt(
+                (thumbTip.x - palmCenter.x) ** 2 +
+                (thumbTip.y - palmCenter.y) ** 2
+            );
+
+            // НОВОЕ: Проверка что оба пальца вытянуты ОДИНАКОВО (параллельны)
+            // Это предотвращает ложные срабатывания когда один палец согнут
+            const fingersEvenlyExtended = Math.abs(indexFromPalm - middleFromPalm) < 0.04;
+
+            // СБАЛАНСИРОВАННЫЕ КРИТЕРИИ (золотая середина):
+            const fingersClose = fingersDist < 0.035;             // БАЛАНС: между строгим (0.025) и мягким (0.055)
+            const bothExtended = indexFromPalm > 0.14 &&          // БАЛАНС: между 0.12 и 0.15
+                                middleFromPalm > 0.14;
+            const bothLongEnough = indexLength > 0.075 &&         // БАЛАНС: между 0.07 и 0.08
+                                  middleLength > 0.075;
+            const notPinching = thumbIndexDist > 0.055;           // Чуть мягче для удобства
+            const notFist = thumbToPalm > 0.085;                  // БАЛАНС: между 0.08 и 0.09
+
+            return fingersClose &&
+                   bothExtended &&
+                   bothLongEnough &&
+                   fingersEvenlyExtended &&  // НОВАЯ проверка!
+                   notPinching &&
+                   notFist;
+        }
+
+        // Детекция мизинца (только мизинец поднят)
+        function isPinkyUp(landmarks) {
+            const palm = landmarks[0];
+            const palmCenter = landmarks[9];
+            const pinkyTip = landmarks[20];
+            const pinkyBase = landmarks[17];
+            const indexTip = landmarks[8];
+            const middleTip = landmarks[12];
+            const ringTip = landmarks[16];
+            const thumbTip = landmarks[4];
+
+            // 1. Мизинец вытянут
+            const pinkyExtended = Math.sqrt(
+                (pinkyTip.x - pinkyBase.x) ** 2 +
+                (pinkyTip.y - pinkyBase.y) ** 2
+            ) > 0.05;
+
+            // 2. Расстояния от ладони
             const pinkyFromPalm = Math.sqrt(
-                (pinkyTip.x - palm.x) ** 2 +
-                (pinkyTip.y - palm.y) ** 2
+                (pinkyTip.x - palmCenter.x) ** 2 +
+                (pinkyTip.y - palmCenter.y) ** 2
+            );
+            const indexFromPalm = Math.sqrt(
+                (indexTip.x - palmCenter.x) ** 2 +
+                (indexTip.y - palmCenter.y) ** 2
+            );
+            const middleFromPalm = Math.sqrt(
+                (middleTip.x - palmCenter.x) ** 2 +
+                (middleTip.y - palmCenter.y) ** 2
+            );
+            const ringFromPalm = Math.sqrt(
+                (ringTip.x - palmCenter.x) ** 2 +
+                (ringTip.y - palmCenter.y) ** 2
+            );
+            const thumbFromPalm = Math.sqrt(
+                (thumbTip.x - palmCenter.x) ** 2 +
+                (thumbTip.y - palmCenter.y) ** 2
             );
 
-            // Скрещены если:
-            // 1. Указательный и средний ОЧЕНЬ близко друг к другу
-            // 2. Оба ХОРОШО вытянуты от ладони
-            // 3. Пальцы НЕ согнуты (не кулак)
-            // 4. Безымянный и мизинец тоже вытянуты (не кулак)
-            return fingersDist < 0.03 &&           // УЖЕСТОЧЕНО: было 0.04
-                   indexFromPalm > 0.18 &&          // УЖЕСТОЧЕНО: было 0.15
-                   middleFromPalm > 0.18 &&         // УЖЕСТОЧЕНО: было 0.15
-                   indexNotClosed &&
-                   middleNotClosed &&
-                   ringFromPalm > 0.14 &&           // УЖЕСТОЧЕНО: было 0.12
-                   pinkyFromPalm > 0.12;            // УЖЕСТОЧЕНО: было 0.1
+            // УЛУЧШЕНО v2: Более гибкая детекция
+            // 3. Мизинец дальше от ладони чем остальные пальцы (СМЯГЧЕНО)
+            const pinkyFarthest = pinkyFromPalm > 0.10 &&                    // СМЯГЧЕНО: было 0.12
+                                  pinkyFromPalm > indexFromPalm * 0.80 &&    // СМЯГЧЕНО: было 0.85
+                                  pinkyFromPalm > middleFromPalm * 0.80 &&
+                                  pinkyFromPalm > ringFromPalm * 0.75;       // СМЯГЧЕНО: было 0.85
+
+            // 4. Другие пальцы относительно согнуты (СМЯГЧЕНО)
+            const othersClosed = indexFromPalm < 0.15 &&    // СМЯГЧЕНО: было 0.14
+                                middleFromPalm < 0.15 &&
+                                ringFromPalm < 0.13;        // СМЯГЧЕНО: было 0.12
+
+            // 5. Большой палец не сильно вытянут (СМЯГЧЕНО)
+            const thumbNotExtended = thumbFromPalm < 0.17;  // СМЯГЧЕНО: было 0.16
+
+            // 6. Не щипок
+            const thumbIndexDist = Math.sqrt(
+                (thumbTip.x - indexTip.x) ** 2 +
+                (thumbTip.y - indexTip.y) ** 2
+            );
+            const notPinching = thumbIndexDist > 0.05;
+
+            return pinkyExtended &&
+                   pinkyFarthest &&
+                   othersClosed &&
+                   thumbNotExtended &&
+                   notPinching;
+        }
+
+        // УЛУЧШЕНО: Проверка стабильности индивидуального жеста
+        function isGestureStable(gestureName, currentValue) {
+            const stability = GESTURE_STABILITY[gestureName];
+            if (!stability) return currentValue;
+
+            // Добавляем текущее значение в историю
+            stability.history.push(currentValue);
+            if (stability.history.length > GESTURE_HISTORY_SIZE) {
+                stability.history.shift();
+            }
+
+            // Подсчитываем сколько раз жест был true в истории
+            const trueCount = stability.history.filter(v => v).length;
+
+            // Жест стабилен если выполнено минимальное требование
+            return trueCount >= stability.required;
+        }
+
+        // УЛУЧШЕНО: Определение основного жеста с приоритетом (для избежания конфликтов)
+        function getPrimaryGesture(landmarks) {
+            const pinchDist = getPinchDistance(landmarks);
+
+            // Проверяем все жесты (raw detection)
+            const rawGestures = {
+                isPinching: isPinching(landmarks),  // УЛУЧШЕНО: используем новую функцию
+                isPinky: isPinkyUp(landmarks),
+                isCrossed: isFingersCrossed(landmarks),
+                isFist: isHandFist(landmarks),
+                isOpen: isHandOpen(landmarks)
+            };
+
+            // УЛУЧШЕНО: Применяем стабильность к каждому жесту индивидуально
+            const stableGestures = {
+                isPinching: isGestureStable('pinch', rawGestures.isPinching),
+                isPinky: isGestureStable('pinky', rawGestures.isPinky),
+                isCrossed: isGestureStable('crossed', rawGestures.isCrossed),
+                isFist: isGestureStable('fist', rawGestures.isFist),
+                isOpen: isGestureStable('open', rawGestures.isOpen)
+            };
+
+            // ПРИОРИТЕТ ЖЕСТОВ (от высокого к низкому):
+            // 1. Щипок - для создания молекул (самый специфичный)
+            if (stableGestures.isPinching) {
+                return {
+                    isPinching: true,
+                    isPinky: false,
+                    isCrossed: false,
+                    isFist: false,
+                    isOpen: false,
+                    primaryGesture: 'pinch'
+                };
+            }
+
+            // 2. Мизинец - для разблокировки (очень специфичный жест)
+            if (stableGestures.isPinky) {
+                return {
+                    isPinching: false,
+                    isPinky: true,
+                    isCrossed: false,
+                    isFist: false,
+                    isOpen: false,
+                    primaryGesture: 'pinky'
+                };
+            }
+
+            // 3. Скрещенные пальцы - для удаления (специфичный)
+            if (stableGestures.isCrossed) {
+                return {
+                    isPinching: false,
+                    isPinky: false,
+                    isCrossed: true,
+                    isFist: false,
+                    isOpen: false,
+                    primaryGesture: 'crossed'
+                };
+            }
+
+            // 4. Кулак - для фиксации (более общий)
+            if (stableGestures.isFist) {
+                return {
+                    isPinching: false,
+                    isPinky: false,
+                    isCrossed: false,
+                    isFist: true,
+                    isOpen: false,
+                    primaryGesture: 'fist'
+                };
+            }
+
+            // 5. Открытая ладонь - для перемещения (самый общий)
+            if (stableGestures.isOpen) {
+                return {
+                    isPinching: false,
+                    isPinky: false,
+                    isCrossed: false,
+                    isFist: false,
+                    isOpen: true,
+                    primaryGesture: 'open'
+                };
+            }
+
+            // Нет распознанного жеста
+            return {
+                isPinching: false,
+                isPinky: false,
+                isCrossed: false,
+                isFist: false,
+                isOpen: false,
+                primaryGesture: 'none'
+            };
         }
 
         // Обработка результатов MediaPipe
+        let frameCount = 0;
         function onResults(results) {
             const newHands = [];
             const currentFrame = [];
+
+            // Логируем каждые 60 кадров
+            frameCount++;
+            if (frameCount % 60 === 0) {
+                console.log('MediaPipe Hands работает. Обнаружено рук:', results.multiHandLandmarks ? results.multiHandLandmarks.length : 0);
+            }
 
             if (results.multiHandLandmarks) {
                 results.multiHandLandmarks.forEach((landmarks, idx) => {
@@ -1081,11 +1445,24 @@
                     const handX = (1 - palm.x) * width;
                     const handY = palm.y * height;
 
+                    // УЛУЧШЕНО: Используем приоритетную систему жестов
+                    const gestureResult = getPrimaryGesture(landmarks);
                     const pinchDist = getPinchDistance(landmarks);
-                    const isPinching = pinchDist < 0.05;
-                    const isOpen = isHandOpen(landmarks);
-                    const isFist = isHandFist(landmarks);
-                    const isCrossed = isFingersCrossed(landmarks);
+
+                    const isPinching = gestureResult.isPinching;
+                    const isOpen = gestureResult.isOpen;
+                    const isFist = gestureResult.isFist;
+                    const isCrossed = gestureResult.isCrossed;
+                    const isPinky = gestureResult.isPinky;
+
+                    // УЛУЧШЕНО: Используем точную детекцию загнутых пальцев
+                    const fingersState = detectFoldedFingers(landmarks);
+
+                    // Ширина раскрытия ладони (расстояние от большого пальца до мизинца)
+                    const handWidth = Math.sqrt(
+                        (landmarks[4].x - landmarks[20].x) ** 2 +
+                        (landmarks[4].y - landmarks[20].y) ** 2
+                    );
 
                     const handData = {
                         x: handX,
@@ -1094,14 +1471,18 @@
                         isOpen,
                         isFist,
                         isCrossed,
+                        isPinky,
+                        fingersState,
+                        handWidth,
                         pinchDist // Сохраняем для изменения размера
                     };
 
                     newHands.push(handData);
                     currentFrame.push(handData);
 
-                    // Создание молекулы при щипке (но НЕ при кулаке!)
-                    if (isPinching && !isFist && !previousPinchStates[idx]) {
+                    // Создание молекулы при щипке (но НЕ при кулаке и других жестах!)
+                    // УЛУЧШЕНО: добавлена проверка на скрещенные пальцы и мизинец
+                    if (isPinching && !isFist && !isCrossed && !isPinky && !previousPinchStates[idx]) {
                         molecules.push(new Molecule(
                             handX,
                             handY,
@@ -1138,9 +1519,105 @@
 
         handsDetector.onResults(onResults);
 
+        // Инициализация MediaPipe FaceMesh для детекции открытого рта
+        const faceMesh = new FaceMesh({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+            }
+        });
+
+        faceMesh.setOptions({
+            maxNumFaces: 1,
+            refineLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        faceMesh.onResults(onFaceResults);
+
+        // Обработка результатов FaceMesh
+        function onFaceResults(results) {
+            try {
+                if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                    const landmarks = results.multiFaceLandmarks[0];
+
+                    // FaceMesh использует индексы:
+                    // 13 - верхняя внутренняя губа
+                    // 14 - нижняя внутренняя губа
+                    // Для более точного определения используем:
+                    // 13 и 14 для внутренних точек губ
+                    if (landmarks[13] && landmarks[14]) {
+                        const upperLip = landmarks[13];
+                        const lowerLip = landmarks[14];
+
+                        // Расстояние между верхней и нижней губой
+                        const mouthOpenDistance = Math.abs(lowerLip.y - upperLip.y);
+
+                        // Если расстояние больше порога - рот открыт
+                        isMouthOpen = mouthOpenDistance > 0.02; // Подобранный порог
+
+                        // TOGGLE режима редактирования при открытии рта
+                        if (isMouthOpen && !wasMouthOpen) {
+                            // Момент открытия рта - переключаем режим
+                            if (editingMolecule) {
+                                // Выключаем режим редактирования
+                                editingMolecule.isEditing = false;
+                                editingMolecule = null;
+                            } else {
+                                // Включаем режим - ищем ближайшую молекулу к центру экрана
+                                let closestMol = null;
+                                let closestDist = Infinity;
+                                const centerX = width / 2;
+                                const centerY = height / 2;
+
+                                molecules.forEach(mol => {
+                                    const dist = Math.sqrt((mol.x - centerX) ** 2 + (mol.y - centerY) ** 2);
+                                    if (dist < closestDist) {
+                                        closestDist = dist;
+                                        closestMol = mol;
+                                    }
+                                });
+
+                                if (closestMol) {
+                                    // Выключаем режим у всех молекул
+                                    molecules.forEach(m => m.isEditing = false);
+                                    // Включаем режим для выбранной
+                                    closestMol.isEditing = true;
+                                    editingMolecule = closestMol;
+                                }
+                            }
+                        }
+
+                        wasMouthOpen = isMouthOpen;
+                    } else {
+                        isMouthOpen = false;
+                        wasMouthOpen = false;
+                    }
+                } else {
+                    isMouthOpen = false;
+                    wasMouthOpen = false;
+                }
+            } catch (error) {
+                console.warn('Ошибка в onFaceResults:', error);
+                isMouthOpen = false;
+                wasMouthOpen = false;
+            }
+        }
+
         // Инициализация камеры
         async function setupCamera() {
+            console.log('Начинаем инициализацию камеры...');
+
+            // Проверяем поддержку API
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.error('getUserMedia не поддерживается в этом браузере');
+                status.textContent = 'Ошибка: браузер не поддерживает доступ к камере';
+                return null;
+            }
+
             try {
+                console.log('Запрашиваем доступ к камере...');
+
                 // Определяем мобильное устройство
                 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
@@ -1155,26 +1632,45 @@
                     facingMode: 'user'
                 };
 
+                console.log('Параметры видео:', videoConstraints);
+
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: videoConstraints
                 });
+
+                console.log('Доступ к камере получен!', stream);
                 video.srcObject = stream;
+
                 return new Promise((resolve) => {
-                    video.onloadedmetadata = () => resolve(video);
+                    video.onloadedmetadata = () => {
+                        console.log('Метаданные видео загружены');
+                        resolve(video);
+                    };
                 });
             } catch (error) {
                 console.error('Ошибка доступа к камере:', error);
+                console.error('Имя ошибки:', error.name);
+                console.error('Сообщение:', error.message);
+
+                status.textContent = `Ошибка камеры: ${error.name}`;
+
                 // Пробуем с более простыми параметрами
                 try {
+                    console.log('Пробуем запросить камеру с базовыми параметрами...');
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: true
                     });
+                    console.log('Доступ к камере получен (базовые параметры)!', stream);
                     video.srcObject = stream;
                     return new Promise((resolve) => {
-                        video.onloadedmetadata = () => resolve(video);
+                        video.onloadedmetadata = () => {
+                            console.log('Метаданные видео загружены (базовые параметры)');
+                            resolve(video);
+                        };
                     });
                 } catch (fallbackError) {
                     console.error('Не удалось получить доступ к камере:', fallbackError);
+                    status.textContent = `Ошибка: ${fallbackError.message}`;
                     return null;
                 }
             }
@@ -1202,26 +1698,201 @@
                 analyzeAudio();
             }
 
+            // Фиксация с таймером
+            const fists = hands.filter(h => h.isFist);
+            const twoFistsStable = checkStableTwoHands('isFist');
+
+            // ФИКСАЦИЯ ВСЕХ МОЛЕКУЛ - два кулака удерживать 2 секунды
+            if (fists.length === 2 && twoFistsStable) {
+                if (twoFistsHoldStart === null) {
+                    twoFistsHoldStart = Date.now();
+                } else {
+                    const holdDuration = Date.now() - twoFistsHoldStart;
+                    if (holdDuration >= HOLD_DURATION) {
+                        // Фиксируем ВСЕ молекулы
+                        molecules.forEach(mol => {
+                            if (!mol.isLocked) {
+                                mol.targetStretchX = mol.stretchX;
+                                mol.targetStretchY = mol.stretchY;
+                                mol.isLocked = true;
+                                mol.isShapeLocked = true;
+                                mol.isGrabbed = false;
+                                mol.isEditing = false;
+                            }
+                        });
+                    }
+                }
+            } else {
+                twoFistsHoldStart = null;
+            }
+
+            // ФИКСАЦИЯ ОДНОЙ МОЛЕКУЛЫ - один кулак над молекулой удерживать 2 секунды
+            if (fists.length === 1 && hands.length === 1) {
+                const fist = fists[0];
+                let closestMol = null;
+                let closestDist = Infinity;
+
+                // Находим ближайшую незаблокированную молекулу
+                molecules.forEach(mol => {
+                    if (!mol.isLocked) {
+                        const dist = Math.sqrt((mol.x - fist.x) ** 2 + (mol.y - fist.y) ** 2);
+                        if (dist < 150 && dist < closestDist) {
+                            closestDist = dist;
+                            closestMol = mol;
+                        }
+                    }
+                });
+
+                if (closestMol) {
+                    if (fistHoldMolecule === closestMol) {
+                        // Продолжаем удерживать над той же молекулой
+                        const holdDuration = Date.now() - fistHoldStart;
+                        if (holdDuration >= HOLD_DURATION) {
+                            // Фиксируем эту молекулу
+                            closestMol.targetStretchX = closestMol.stretchX;
+                            closestMol.targetStretchY = closestMol.stretchY;
+                            closestMol.isLocked = true;
+                            closestMol.isShapeLocked = true;
+                            closestMol.isGrabbed = false;
+                            closestMol.isEditing = false;
+                            fistHoldStart = null;
+                            fistHoldMolecule = null;
+                        }
+                    } else {
+                        // Начинаем отсчет с новой молекулой
+                        fistHoldStart = Date.now();
+                        fistHoldMolecule = closestMol;
+                    }
+                } else {
+                    fistHoldStart = null;
+                    fistHoldMolecule = null;
+                }
+            } else {
+                fistHoldStart = null;
+                fistHoldMolecule = null;
+            }
+
+            // РАЗБЛОКИРОВКА МИЗИНЦЕМ - показать мизинец на заблокированной молекуле
+            const pinkyHands = hands.filter(h => h.isPinky);
+            if (pinkyHands.length === 1) {
+                const pinky = pinkyHands[0];
+                molecules.forEach(mol => {
+                    if (mol.isLocked) {
+                        const dist = Math.sqrt((mol.x - pinky.x) ** 2 + (mol.y - pinky.y) ** 2);
+                        if (dist < 150) {
+                            mol.isLocked = false;
+                            mol.isShapeLocked = false;
+                        }
+                    }
+                });
+            }
+
             // Обновление молекул
             molecules.forEach(mol => mol.update());
 
-            // Удаление молекул жестом скрещенных пальцев
+            // УДАЛЕНИЕ МОЛЕКУЛЫ - скрещенные пальцы удерживать 2 секунды
             const crossedHands = hands.filter(h => h.isCrossed);
-            if (crossedHands.length > 0) {
-                molecules = molecules.filter(mol => {
-                    // Проверяем расстояние до каждой руки со скрещенными пальцами
-                    for (const hand of crossedHands) {
-                        const dist = Math.sqrt((mol.x - hand.x) ** 2 + (mol.y - hand.y) ** 2);
-                        if (dist < 80) {
-                            return false; // Удаляем молекулу
-                        }
+            if (crossedHands.length === 1) {
+                const crossed = crossedHands[0];
+                let closestMol = null;
+                let closestDist = Infinity;
+
+                // Находим ближайшую молекулу
+                molecules.forEach(mol => {
+                    const dist = Math.sqrt((mol.x - crossed.x) ** 2 + (mol.y - crossed.y) ** 2);
+                    if (dist < 120 && dist < closestDist) {
+                        closestDist = dist;
+                        closestMol = mol;
                     }
-                    return true; // Оставляем молекулу
                 });
+
+                if (closestMol) {
+                    // УЛУЧШЕНО: Жест обнаружен - сбрасываем счётчик потери
+                    crossedHoldLostTime = null;
+
+                    if (crossedHoldMolecule === closestMol) {
+                        // Продолжаем удерживать над той же молекулой
+                        const holdDuration = Date.now() - crossedHoldStart;
+                        if (holdDuration >= HOLD_DURATION) {
+                            // Удаляем молекулу после 2 секунд
+                            // Сбрасываем режим редактирования если удаляемая молекула в этом режиме
+                            if (editingMolecule === closestMol) {
+                                editingMolecule = null;
+                            }
+                            molecules = molecules.filter(m => m !== closestMol);
+                            crossedHoldStart = null;
+                            crossedHoldMolecule = null;
+                            crossedHoldLostTime = null;
+                        }
+                    } else {
+                        // Начинаем отсчет с новой молекулой
+                        crossedHoldStart = Date.now();
+                        crossedHoldMolecule = closestMol;
+                        crossedHoldLostTime = null;
+                    }
+                } else {
+                    // УЛУЧШЕНО: Нет молекулы рядом - используем толерантность
+                    if (crossedHoldStart && !crossedHoldLostTime) {
+                        crossedHoldLostTime = Date.now();
+                    } else if (crossedHoldLostTime && (Date.now() - crossedHoldLostTime > RESET_TOLERANCE)) {
+                        crossedHoldStart = null;
+                        crossedHoldMolecule = null;
+                        crossedHoldLostTime = null;
+                    }
+                }
+            } else {
+                // УЛУЧШЕНО: Жест потерян - используем толерантность перед сбросом
+                if (crossedHoldStart && !crossedHoldLostTime) {
+                    crossedHoldLostTime = Date.now();
+                } else if (crossedHoldLostTime && (Date.now() - crossedHoldLostTime > RESET_TOLERANCE)) {
+                    crossedHoldStart = null;
+                    crossedHoldMolecule = null;
+                    crossedHoldLostTime = null;
+                }
             }
 
             // Рисование метаболлов
             drawMetaballs();
+
+            // Визуализация прогресса таймеров
+
+            // Прогресс фиксации одной молекулы
+            if (fistHoldMolecule && fistHoldStart) {
+                const progress = (Date.now() - fistHoldStart) / HOLD_DURATION;
+                const angle = Math.PI * 2 * progress;
+
+                ctx.strokeStyle = 'rgba(255, 200, 0, 0.9)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(fistHoldMolecule.x, fistHoldMolecule.y, 35, -Math.PI / 2, -Math.PI / 2 + angle);
+                ctx.stroke();
+
+                // Текст прогресса
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.9)';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🔒', fistHoldMolecule.x, fistHoldMolecule.y);
+            }
+
+            // Прогресс удаления молекулы
+            if (crossedHoldMolecule && crossedHoldStart) {
+                const progress = (Date.now() - crossedHoldStart) / HOLD_DURATION;
+                const angle = Math.PI * 2 * progress;
+
+                ctx.strokeStyle = 'rgba(255, 50, 50, 0.9)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(crossedHoldMolecule.x, crossedHoldMolecule.y, 35, -Math.PI / 2, -Math.PI / 2 + angle);
+                ctx.stroke();
+
+                // Текст прогресса
+                ctx.fillStyle = 'rgba(255, 50, 50, 0.9)';
+                ctx.font = '18px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🗑️', crossedHoldMolecule.x, crossedHoldMolecule.y);
+            }
 
             // Визуализация захваченных/заблокированных молекул
             molecules.forEach(mol => {
@@ -1262,6 +1933,35 @@
                         ctx.lineTo(mol.x - size, mol.y + size);
                         ctx.stroke();
                     }
+                } else if (mol.isEditing) {
+                    // Яркий пульсирующий круг для режима редактирования
+                    const pulse = 0.5 + Math.sin(Date.now() / 300) * 0.2;
+                    ctx.strokeStyle = `rgba(50, 150, 255, ${pulse})`;
+                    ctx.lineWidth = 5;
+                    ctx.setLineDash([10, 5]);
+                    ctx.beginPath();
+                    ctx.arc(mol.x, mol.y, 35 + Math.sin(Date.now() / 400) * 3, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Иконка редактирования
+                    ctx.font = '24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = 'rgba(50, 150, 255, 0.9)';
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeText('✎', mol.x, mol.y - 50);
+                    ctx.fillText('✎', mol.x, mol.y - 50);
+
+                    // Подсказка о режиме
+                    ctx.font = '13px Arial';
+                    ctx.fillStyle = 'rgba(50, 150, 255, 0.8)';
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+                    ctx.lineWidth = 2;
+                    const hint = 'Режим редактирования (откройте рот для выхода)';
+                    ctx.strokeText(hint, mol.x, mol.y + 55);
+                    ctx.fillText(hint, mol.x, mol.y + 55);
                 } else if (mol.isGrabbed) {
                     // Зелёный круг для захваченных
                     ctx.strokeStyle = 'rgba(50, 255, 50, 0.8)';
@@ -1275,12 +1975,16 @@
             // Визуализация рук
             hands.forEach(hand => {
                 let color, label;
-                if (hand.isCrossed) {
-                    color = 'rgba(255, 50, 150, 0.7)';
-                    label = '🤞';
-                } else if (hand.isPinching) {
+                // УЛУЧШЕНО: Приоритетный порядок отображения жестов
+                if (hand.isPinching) {
                     color = 'rgba(255, 100, 100, 0.6)';
                     label = '✌️';
+                } else if (hand.isPinky) {
+                    color = 'rgba(255, 200, 0, 0.7)';
+                    label = '🤙';
+                } else if (hand.isCrossed) {
+                    color = 'rgba(255, 50, 150, 0.7)';
+                    label = '🤞';
                 } else if (hand.isFist) {
                     color = 'rgba(255, 150, 50, 0.6)';
                     label = '✊';
@@ -1311,25 +2015,81 @@
             });
 
             // Линия между двумя руками
-            const openHands = hands.filter(h => h.isOpen);
-            if (openHands.length === 2) {
-                ctx.strokeStyle = 'rgba(100, 255, 100, 0.4)';
-                ctx.lineWidth = 3;
-                ctx.setLineDash([5, 5]);
-                ctx.beginPath();
-                ctx.moveTo(openHands[0].x, openHands[0].y);
-                ctx.lineTo(openHands[1].x, openHands[1].y);
-                ctx.stroke();
-                ctx.setLineDash([]);
+            const openHandsForLine = hands.filter(h => h.isOpen);
+            if (openHandsForLine.length === 2) {
+                // Если молекула в режиме редактирования - показываем специальную линию
+                const inEditMode = editingMolecule && editingMolecule.isEditing;
+
+                if (inEditMode) {
+                    // Яркая анимированная линия для режима редактирования
+                    const gradient = ctx.createLinearGradient(
+                        openHandsForLine[0].x, openHandsForLine[0].y,
+                        openHandsForLine[1].x, openHandsForLine[1].y
+                    );
+                    gradient.addColorStop(0, 'rgba(50, 150, 255, 0.7)');
+                    gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.9)');
+                    gradient.addColorStop(1, 'rgba(50, 150, 255, 0.7)');
+
+                    ctx.strokeStyle = gradient;
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([10, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(openHandsForLine[0].x, openHandsForLine[0].y);
+                    ctx.lineTo(openHandsForLine[1].x, openHandsForLine[1].y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Показываем расстояние
+                    const distX = Math.abs(openHandsForLine[1].x - openHandsForLine[0].x);
+                    const distY = Math.abs(openHandsForLine[1].y - openHandsForLine[0].y);
+                    const midX = (openHandsForLine[0].x + openHandsForLine[1].x) / 2;
+                    const midY = (openHandsForLine[0].y + openHandsForLine[1].y) / 2;
+
+                    ctx.font = '12px Arial';
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.lineWidth = 3;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    const text = `↔️ ${Math.round(distX)}px  ↕️ ${Math.round(distY)}px`;
+                    ctx.strokeText(text, midX, midY - 10);
+                    ctx.fillText(text, midX, midY - 10);
+                } else {
+                    // Обычная линия
+                    ctx.strokeStyle = 'rgba(100, 255, 100, 0.4)';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(openHandsForLine[0].x, openHandsForLine[0].y);
+                    ctx.lineTo(openHandsForLine[1].x, openHandsForLine[1].y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
             }
 
             requestAnimationFrame(animate);
         }
 
         // Обработка видео для MediaPipe
+        let detectHandsStarted = false;
         async function detectHands() {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                await handsDetector.send({ image: video });
+                if (!detectHandsStarted) {
+                    console.log('✅ Видео готово, начинаем детекцию рук');
+                    detectHandsStarted = true;
+                }
+                try {
+                    await handsDetector.send({ image: video });
+                    // FaceMesh опционально - не блокирует работу рук
+                    try {
+                        await faceMesh.send({ image: video });
+                    } catch (faceError) {
+                        // Игнорируем ошибки FaceMesh
+                    }
+                } catch (error) {
+                    console.error('❌ Ошибка детекции рук:', error);
+                }
             }
             requestAnimationFrame(detectHands);
         }
@@ -1410,27 +2170,38 @@
 
         // Инициализация
         async function init() {
+            console.log('=== НАЧАЛО ИНИЦИАЛИЗАЦИИ ===');
+
             resize();
             window.addEventListener('resize', resize);
 
+            console.log('Запускаем анимацию...');
             animate();
 
+            console.log('Запрашиваем доступ к камере и микрофону...');
             const [camera, audio] = await Promise.all([
                 setupCamera(),
                 setupAudio()
             ]);
 
+            console.log('Результаты инициализации - Камера:', camera, 'Аудио:', audio);
+
             if (camera && audio) {
+                console.log('✅ ВСЁ УСПЕШНО ИНИЦИАЛИЗИРОВАНО');
                 loading.style.display = 'none';
-                status.textContent = 'Готово! ✌️ = создать | ✌️ (ширина) = размер | ✋✋ = растянуть | ✊✊ = зафиксировать | 🤞 = удалить';
+                status.textContent = 'Готово! ✌️ = создать | 😮 = режим ✎ | ✋ = двигать | ✊ 2с = фикс | 🤙 = разблок | 🤞 2с = удалить';
                 detectHands();
             } else {
+                console.log('⚠️ Частичная инициализация - Камера:', !!camera, 'Аудио:', !!audio);
                 loading.style.display = 'none';
                 status.textContent = camera ? 'Работает без звука' : 'Работает без камеры';
                 if (camera) detectHands();
             }
+
+            console.log('=== КОНЕЦ ИНИЦИАЛИЗАЦИИ ===');
         }
 
+        console.log('🚀 Запуск приложения...');
         init();
     </script>
 </body>

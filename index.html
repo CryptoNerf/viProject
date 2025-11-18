@@ -502,6 +502,8 @@
         let isMouthOpen = false; // Текущее состояние рта
         let wasMouthOpen = false; // Предыдущее состояние рта для детекции открытия
         let editingMolecule = null; // Молекула в режиме редактирования
+        let hoveredMolecule = null; // Молекула на которую наведена рука СЕЙЧАС
+        let lastHoveredMolecule = null; // Последняя молекула на которую наводились
 
         // Сглаживание жестов - храним историю последних 5 кадров
         const GESTURE_HISTORY_SIZE = 5;
@@ -562,6 +564,10 @@
                 this.targetStretchX = 1;
                 this.targetStretchY = 1;
 
+                // НОВОЕ: Угол деформации (для растяжения под углом)
+                this.deformAngle = 0;
+                this.targetDeformAngle = 0;
+
                 // Для звуковых эффектов
                 this.audioPhase = Math.random() * Math.PI * 2;
                 this.creationAudioLevel = audioLevel;
@@ -584,6 +590,8 @@
                 if (!this.isShapeLocked) {
                     this.stretchX += (this.targetStretchX - this.stretchX) * 0.1;
                     this.stretchY += (this.targetStretchY - this.stretchY) * 0.1;
+                    // НОВОЕ: Плавное изменение угла деформации
+                    this.deformAngle += (this.targetDeformAngle - this.deformAngle) * 0.1;
                 }
 
                 // Плавное изменение размера
@@ -626,20 +634,55 @@
                             const newSize = Math.max(30, Math.min(400, avgHandWidth * 500));
                             this.targetSize = newSize;
 
-                            // УПРАВЛЕНИЕ ФОРМОЙ - расстояние между руками
-                            const handsDistX = Math.abs(hand2.x - hand1.x);
-                            const handsDistY = Math.abs(hand2.y - hand1.y);
+                            // ПРОДВИНУТОЕ УПРАВЛЕНИЕ ФОРМОЙ - с поворотом и асимметрией
+                            // Векторы от центра молекулы к каждой руке
+                            const vec1X = hand1.x - this.x;
+                            const vec1Y = hand1.y - this.y;
+                            const vec2X = hand2.x - this.x;
+                            const vec2Y = hand2.y - this.y;
 
-                            // Растяжение по горизонтали зависит от горизонтального расстояния между руками
-                            // Базовое расстояние ~ 200px = круглая форма (1.0)
-                            // Больше расстояние → больше растяжение
-                            // Меньше расстояние → сжатие
-                            const baseDistX = 200;
-                            this.targetStretchX = Math.max(0.3, Math.min(3.0, handsDistX / baseDistX));
+                            // Расстояния от молекулы до каждой руки
+                            const dist1FromMol = Math.sqrt(vec1X * vec1X + vec1Y * vec1Y);
+                            const dist2FromMol = Math.sqrt(vec2X * vec2X + vec2Y * vec2Y);
 
-                            // Растяжение по вертикали зависит от вертикального расстояния
-                            const baseDistY = 200;
-                            this.targetStretchY = Math.max(0.3, Math.min(3.0, handsDistY / baseDistY));
+                            // Вектор между руками
+                            const handsVecX = hand2.x - hand1.x;
+                            const handsVecY = hand2.y - hand1.y;
+                            const handsDist = Math.sqrt(handsVecX * handsVecX + handsVecY * handsVecY);
+
+                            // КЛЮЧЕВОЕ: Угол линии между руками определяет направление растяжения
+                            const handsAngle = Math.atan2(handsVecY, handsVecX);
+                            this.targetDeformAngle = handsAngle;
+
+                            // Расстояние между руками вдоль их линии = основное растяжение
+                            const mainStretch = Math.max(0.3, Math.min(3.5, handsDist / 150));
+
+                            // Расстояние рук от молекулы = боковое сжатие/растяжение
+                            const avgDistFromMol = (dist1FromMol + dist2FromMol) / 2;
+
+                            // Если руки близко к молекуле (прижимают) → сжатие поперёк
+                            // Если руки далеко от молекулы → меньше влияния
+                            const crossStretch = Math.max(0.3, Math.min(1.5,
+                                avgDistFromMol < 120 ? (avgDistFromMol / 120) : 1.0
+                            ));
+
+                            // Применяем деформацию в локальной системе координат
+                            // mainStretch - вдоль линии между руками
+                            // crossStretch - поперёк линии между руками
+                            this.targetStretchX = mainStretch;
+                            this.targetStretchY = crossStretch;
+
+                            // ОСОБЫЙ СЛУЧАЙ: Если руки очень близко друг к другу - сжимаем во всех направлениях
+                            if (handsDist < 80) {
+                                const squeezeFactor = Math.max(0.3, handsDist / 80);
+                                this.targetStretchX = squeezeFactor;
+                                this.targetStretchY = squeezeFactor;
+                            }
+
+                            // ОСОБЫЙ СЛУЧАЙ: Если руки очень далеко друг от друга - сильное растяжение
+                            if (handsDist > 300) {
+                                this.targetStretchX = Math.min(4.0, handsDist / 100);
+                            }
                         } else {
                             this.isGrabbed = false;
                         }
@@ -665,7 +708,7 @@
                         this.isGrabbed = false;
                     }
                 } else if (!this.isEditing && openHands.length === 1) {
-                    // ОБЫЧНЫЙ РЕЖИМ - только перемещение ладонью
+                    // ОБЫЧНЫЙ РЕЖИМ - только перемещение ладонью (форма сохраняется!)
                     const hand = openHands[0];
                     const dist = Math.sqrt((this.x - hand.x) ** 2 + (this.y - hand.y) ** 2);
 
@@ -673,10 +716,7 @@
                         this.isGrabbed = true;
                         this.targetX = hand.x;
                         this.targetY = hand.y;
-
-                        // Сбрасываем растяжение в обычном режиме
-                        this.targetStretchX = 1;
-                        this.targetStretchY = 1;
+                        // ИСПРАВЛЕНО: Форма НЕ сбрасывается, сохраняется как есть
                     } else {
                         this.isGrabbed = false;
                     }
@@ -697,11 +737,23 @@
                 this.isShapeLocked = false;
             }
 
-            // Функция влияния для метаболлов
+            // Функция влияния для метаболлов с поддержкой поворота
             getInfluence(px, py) {
-                const dx = (px - this.x) / this.stretchX;
-                const dy = (py - this.y) / this.stretchY;
-                const distSq = dx * dx + dy * dy;
+                // Координаты относительно центра молекулы
+                let dx = px - this.x;
+                let dy = py - this.y;
+
+                // НОВОЕ: Поворачиваем координаты на угол деформации (обратный поворот)
+                // Это позволяет растягивать молекулу под любым углом
+                const cos = Math.cos(-this.deformAngle);
+                const sin = Math.sin(-this.deformAngle);
+                const rotatedX = dx * cos - dy * sin;
+                const rotatedY = dx * sin + dy * cos;
+
+                // Применяем растяжение в повёрнутой системе координат
+                const stretchedX = rotatedX / this.stretchX;
+                const stretchedY = rotatedY / this.stretchY;
+                const distSq = stretchedX * stretchedX + stretchedY * stretchedY;
 
                 // Добавляем звуковую модуляцию
                 let audioMod = 1;
@@ -1564,26 +1616,16 @@
                                 editingMolecule.isEditing = false;
                                 editingMolecule = null;
                             } else {
-                                // Включаем режим - ищем ближайшую молекулу к центру экрана
-                                let closestMol = null;
-                                let closestDist = Infinity;
-                                const centerX = width / 2;
-                                const centerY = height / 2;
+                                // Включаем режим для молекулы на которую наведена рука
+                                // Приоритет: текущая hovered молекула > последняя hovered молекула
+                                let moleculeToEdit = hoveredMolecule || lastHoveredMolecule;
 
-                                molecules.forEach(mol => {
-                                    const dist = Math.sqrt((mol.x - centerX) ** 2 + (mol.y - centerY) ** 2);
-                                    if (dist < closestDist) {
-                                        closestDist = dist;
-                                        closestMol = mol;
-                                    }
-                                });
-
-                                if (closestMol) {
+                                if (moleculeToEdit && molecules.includes(moleculeToEdit)) {
                                     // Выключаем режим у всех молекул
                                     molecules.forEach(m => m.isEditing = false);
                                     // Включаем режим для выбранной
-                                    closestMol.isEditing = true;
-                                    editingMolecule = closestMol;
+                                    moleculeToEdit.isEditing = true;
+                                    editingMolecule = moleculeToEdit;
                                 }
                             }
                         }
@@ -1714,12 +1756,15 @@
                             if (!mol.isLocked) {
                                 mol.targetStretchX = mol.stretchX;
                                 mol.targetStretchY = mol.stretchY;
+                                mol.targetDeformAngle = mol.deformAngle; // НОВОЕ: сохраняем угол
                                 mol.isLocked = true;
                                 mol.isShapeLocked = true;
                                 mol.isGrabbed = false;
                                 mol.isEditing = false;
                             }
                         });
+                        // Сбрасываем глобальный режим редактирования
+                        editingMolecule = null;
                     }
                 }
             } else {
@@ -1751,10 +1796,15 @@
                             // Фиксируем эту молекулу
                             closestMol.targetStretchX = closestMol.stretchX;
                             closestMol.targetStretchY = closestMol.stretchY;
+                            closestMol.targetDeformAngle = closestMol.deformAngle; // НОВОЕ: сохраняем угол
                             closestMol.isLocked = true;
                             closestMol.isShapeLocked = true;
                             closestMol.isGrabbed = false;
                             closestMol.isEditing = false;
+                            // Сбрасываем режим редактирования если это редактируемая молекула
+                            if (editingMolecule === closestMol) {
+                                editingMolecule = null;
+                            }
                             fistHoldStart = null;
                             fistHoldMolecule = null;
                         }
@@ -1790,6 +1840,30 @@
             // Обновление молекул
             molecules.forEach(mol => mol.update());
 
+            // ОТСЛЕЖИВАНИЕ МОЛЕКУЛЫ ПОД ЛАДОНЬЮ (для выбора при редактировании)
+            hoveredMolecule = null;
+            const openHands = hands.filter(h => h.isOpen && !h.isPinching && !h.isFist && !h.isCrossed && !h.isPinky);
+            if (openHands.length > 0) {
+                // Ищем ближайшую молекулу под любой открытой ладонью
+                let closestMol = null;
+                let closestDist = Infinity;
+
+                openHands.forEach(hand => {
+                    molecules.forEach(mol => {
+                        const dist = Math.sqrt((mol.x - hand.x) ** 2 + (mol.y - hand.y) ** 2);
+                        if (dist < 150 && dist < closestDist) {
+                            closestDist = dist;
+                            closestMol = mol;
+                        }
+                    });
+                });
+
+                if (closestMol) {
+                    hoveredMolecule = closestMol;
+                    lastHoveredMolecule = closestMol;
+                }
+            }
+
             // УДАЛЕНИЕ МОЛЕКУЛЫ - скрещенные пальцы удерживать 2 секунды
             const crossedHands = hands.filter(h => h.isCrossed);
             if (crossedHands.length === 1) {
@@ -1818,6 +1892,10 @@
                             // Сбрасываем режим редактирования если удаляемая молекула в этом режиме
                             if (editingMolecule === closestMol) {
                                 editingMolecule = null;
+                            }
+                            // Сбрасываем lastHoveredMolecule если это она
+                            if (lastHoveredMolecule === closestMol) {
+                                lastHoveredMolecule = null;
                             }
                             molecules = molecules.filter(m => m !== closestMol);
                             crossedHoldStart = null;
@@ -1970,6 +2048,29 @@
                     ctx.arc(mol.x, mol.y, 25, 0, Math.PI * 2);
                     ctx.stroke();
                 }
+
+                // НОВОЕ: Подсветка молекулы под ладонью (готова к выбору для редактирования)
+                if (mol === hoveredMolecule && !mol.isEditing && !mol.isLocked) {
+                    // Жёлтый круг с пунктиром - показывает что эта молекула будет выбрана
+                    ctx.strokeStyle = 'rgba(255, 200, 50, 0.7)';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([6, 3]);
+                    ctx.beginPath();
+                    ctx.arc(mol.x, mol.y, 28, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Подсказка
+                    ctx.font = '11px Arial';
+                    ctx.fillStyle = 'rgba(255, 200, 50, 0.9)';
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    const hintText = 'Откройте рот для редактирования';
+                    ctx.strokeText(hintText, mol.x, mol.y + 35);
+                    ctx.fillText(hintText, mol.x, mol.y + 35);
+                }
             });
 
             // Визуализация рук
@@ -2052,9 +2153,20 @@
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
 
-                    const text = `↔️ ${Math.round(distX)}px  ↕️ ${Math.round(distY)}px`;
+                    // Вычисляем расстояние и угол
+                    const totalDist = Math.round(Math.sqrt(distX * distX + distY * distY));
+                    const angle = Math.round(editingMolecule.targetDeformAngle * 180 / Math.PI);
+
+                    // Показываем информацию о деформации
+                    const text = `Расстояние: ${totalDist}px | Угол: ${angle}°`;
                     ctx.strokeText(text, midX, midY - 10);
                     ctx.fillText(text, midX, midY - 10);
+
+                    // Дополнительная информация
+                    const stretchInfo = `Растяжение: ${editingMolecule.targetStretchX.toFixed(2)} × ${editingMolecule.targetStretchY.toFixed(2)}`;
+                    ctx.font = '10px Arial';
+                    ctx.strokeText(stretchInfo, midX, midY + 10);
+                    ctx.fillText(stretchInfo, midX, midY + 10);
                 } else {
                     // Обычная линия
                     ctx.strokeStyle = 'rgba(100, 255, 100, 0.4)';

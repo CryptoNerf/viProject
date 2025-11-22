@@ -565,6 +565,32 @@
             color: #805500;
             border: 2px solid #cc8800;
         }
+
+        /* Кнопки режима заливки */
+        .fill-mode-btn {
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 11px;
+            background: #d4d0c8;
+            border: 2px outset #ffffff;
+            cursor: pointer;
+            font-family: 'MS Sans Serif', sans-serif;
+            color: #000;
+        }
+
+        .fill-mode-btn:hover {
+            background: #e0dcd4;
+        }
+
+        .fill-mode-btn:active {
+            border-style: inset;
+        }
+
+        .fill-mode-btn.active {
+            background: #8080ff;
+            color: #fff;
+            border-style: inset;
+        }
     </style>
 </head>
 <body>
@@ -668,6 +694,14 @@
                     </div>
                 </div>
             </div>
+            <div class="color-section">
+                <div class="label-paint">Режим заливки:</div>
+                <div style="display: flex; gap: 5px; margin-top: 5px;">
+                    <button class="fill-mode-btn active" data-mode="both" title="Заливка внутренности и контура">Оба</button>
+                    <button class="fill-mode-btn" data-mode="interior" title="Только внутренность">Внутри</button>
+                    <button class="fill-mode-btn" data-mode="edge" title="Только контур">Контур</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -702,6 +736,7 @@
         let currentTool = 'select'; // Текущий инструмент (select, fill, pencil, eraser)
         let primaryColor = '#000000'; // Основной цвет
         let secondaryColor = '#ffffff'; // Фоновый цвет
+        let fillMode = 'both'; // Режим заливки: 'interior' (внутренность), 'edge' (контур), 'both' (оба)
 
         // Палитра Paint (28 классических цветов)
         const paintColors = [
@@ -839,6 +874,10 @@
                 this.isLocked = false; // Зафиксирована позиция
                 this.isShapeLocked = false; // Зафиксирована форма (растяжение)
                 this.isEditing = false; // Режим редактирования
+
+                // Цвета для Paint редактора (раздельные)
+                this.fillColor = null; // Цвет заливки внутренности
+                this.edgeColor = null; // Цвет заливки контура (пиксельный эффект)
             }
 
             update() {
@@ -1233,16 +1272,45 @@
                 }
             }
 
-            // Marching squares
-            ctx.fillStyle = '#f5f5f5';
-            ctx.strokeStyle = '#1a1a1a';
-            ctx.lineWidth = 2.5;
-
             // ИСПРАВЛЕНО: Threshold рассчитывается так, чтобы одиночная молекула
             // сохраняла постоянный размер, но при этом радиус влияния увеличивался
             // Формула: при mergeStrength=1 threshold=0.5, при mergeStrength=2 threshold=0.667
             // Это позволяет молекулам сливаться на большем расстоянии при высоком mergeStrength
             const threshold = config.mergeStrength / (1 + config.mergeStrength);
+
+            // ПЕРВЫЙ СЛОЙ: Гладкая заливка внутренних областей
+            // Проходим по всем пикселям сетки и заливаем внутренности гладко
+            const fillResolution = 4; // Шаг для заливки (пиксели)
+
+            for (let py = 0; py < height; py += fillResolution) {
+                for (let px = 0; px < width; px += fillResolution) {
+                    // Вычисляем влияние в этой точке
+                    let totalInfluence = 0;
+                    let maxInfluence = 0;
+                    let dominantMol = null;
+
+                    for (const mol of molecules) {
+                        const influence = mol.getInfluence(px, py);
+                        totalInfluence += influence;
+
+                        if (influence > maxInfluence) {
+                            maxInfluence = influence;
+                            dominantMol = mol;
+                        }
+                    }
+
+                    // Если точка внутри контура (влияние выше порога) и есть fillColor
+                    if (totalInfluence >= threshold && dominantMol && dominantMol.fillColor) {
+                        ctx.fillStyle = dominantMol.fillColor;
+                        ctx.fillRect(px, py, fillResolution, fillResolution);
+                    }
+                }
+            }
+
+            // ВТОРОЙ СЛОЙ: Marching squares с блочным эффектом на контурах
+            ctx.fillStyle = '#f5f5f5';
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 2.5;
 
             for (let i = 0; i < rows - 1; i++) {
                 for (let j = 0; j < cols - 1; j++) {
@@ -1258,18 +1326,18 @@
 
                     if (cellIndex === 0 || cellIndex === 15) continue;
 
-                    // Определяем цвет для этой ячейки (по доминирующей молекуле в центре)
+                    // Определяем цвет контура для этой ячейки (по доминирующей молекуле в центре)
                     const centerMol = dominantMolecule[i][j];
-                    const cellColor = (centerMol && centerMol.color) ? centerMol.color : '#f5f5f5';
+                    const cellEdgeColor = (centerMol && centerMol.edgeColor) ? centerMol.edgeColor : null;
 
-                    // Рисуем ячейку с заливкой и контуром
-                    drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold, cellColor);
+                    // Рисуем ячейку с блочной заливкой контура
+                    drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold, cellEdgeColor);
                 }
             }
         }
 
         // Отрисовка одной ячейки marching squares
-        function drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold, fillColor) {
+        function drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold, edgeColor) {
             const size = gridResolution;
 
             // Интерполяция позиций на гранях
@@ -1312,58 +1380,22 @@
 
             if (!lines[cellIndex]) return;
 
-            // Если есть цвет - сначала заливаем область
-            if (fillColor && fillColor !== '#f5f5f5') {
-                ctx.fillStyle = fillColor;
-
-                // Создаём замкнутый путь для заливки на основе конфигурации
-                // Упрощённый подход: заливаем прямоугольную ячейку для заполненных областей
-                const corners = [
-                    { x: x, y: y },           // tl
-                    { x: x + size, y: y },     // tr
-                    { x: x + size, y: y + size }, // br
-                    { x: x, y: y + size }      // bl
-                ];
-
+            // БЛОЧНЫЙ ЭФФЕКТ: Рисуем блочную заливку только на краевых ячейках
+            // (те, что пересекаются контуром - 1-2 заполненных угла)
+            // Это создаёт крутой пиксельный эффект на границах
+            if (edgeColor) {
                 const tl = field[i][j] >= threshold;
                 const tr = field[i][j + 1] >= threshold;
                 const br = field[i + 1][j + 1] >= threshold;
                 const bl = field[i + 1][j] >= threshold;
 
-                // Создаём путь заливки в зависимости от конфигурации
-                ctx.beginPath();
-
-                // Для упрощения: если хотя бы 2 угла внутри - заливаем всю ячейку
                 const filledCorners = [tl, tr, br, bl].filter(Boolean).length;
-                if (filledCorners >= 2) {
-                    // Заливаем всю ячейку
+
+                // Блочный эффект только для частично заполненных ячеек (1-2 угла)
+                // Это ячейки, которые пересекаются контуром
+                if (filledCorners >= 1 && filledCorners <= 2) {
+                    ctx.fillStyle = edgeColor;
                     ctx.fillRect(x, y, size, size);
-                } else if (filledCorners > 0) {
-                    // Частичная заливка - создаём полигон
-                    const points = [];
-
-                    // Добавляем точки на рёбрах
-                    for (const [e1, e2] of lines[cellIndex]) {
-                        const p1 = getEdgePoint(e1);
-                        const p2 = getEdgePoint(e2);
-                        points.push(p1, p2);
-                    }
-
-                    // Добавляем заполненные углы
-                    if (tl) points.push(corners[0]);
-                    if (tr) points.push(corners[1]);
-                    if (br) points.push(corners[2]);
-                    if (bl) points.push(corners[3]);
-
-                    // Рисуем полигон
-                    if (points.length > 0) {
-                        ctx.moveTo(points[0].x, points[0].y);
-                        for (let k = 1; k < points.length; k++) {
-                            ctx.lineTo(points[k].x, points[k].y);
-                        }
-                        ctx.closePath();
-                        ctx.fill();
-                    }
                 }
             }
 
@@ -2882,7 +2914,8 @@
                     stretchX: mol.stretchX,
                     stretchY: mol.stretchY,
                     deformAngle: mol.deformAngle,
-                    color: mol.color || null // Сохраняем цвет если есть
+                    fillColor: mol.fillColor || null, // Сохраняем цвет заливки внутренности
+                    edgeColor: mol.edgeColor || null  // Сохраняем цвет заливки контура
                 }));
 
                 status.textContent = `Режим редактора | Молекул: ${molecules.length}`;
@@ -2901,7 +2934,8 @@
                 // Применяем изменённые цвета обратно к молекулам
                 frozenMolecules.forEach((frozen, i) => {
                     if (molecules[i]) {
-                        molecules[i].color = frozen.color;
+                        molecules[i].fillColor = frozen.fillColor;
+                        molecules[i].edgeColor = frozen.edgeColor;
                     }
                 });
 
@@ -2918,6 +2952,16 @@
                 document.querySelectorAll('.paint-tool').forEach(t => t.classList.remove('selected'));
                 tool.classList.add('selected');
                 currentTool = tool.dataset.tool;
+            });
+        });
+
+        // Выбор режима заливки
+        document.querySelectorAll('.fill-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.fill-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                fillMode = btn.dataset.mode;
+                status.textContent = `Режим заливки: ${btn.textContent}`;
             });
         });
 
@@ -2951,16 +2995,28 @@
                     `Выбрана молекула (${clickedMolecule.size.toFixed(0)}px)` :
                     'Нет выбранной молекулы';
             } else if (currentTool === 'fill' && clickedMolecule) {
-                // Заливка цветом
-                clickedMolecule.color = primaryColor;
+                // Заливка цветом в зависимости от режима
+                if (fillMode === 'interior' || fillMode === 'both') {
+                    clickedMolecule.fillColor = primaryColor;
+                }
+                if (fillMode === 'edge' || fillMode === 'both') {
+                    clickedMolecule.edgeColor = primaryColor;
+                }
 
                 // Обновляем замороженное состояние
                 const molIndex = molecules.indexOf(clickedMolecule);
                 if (frozenMolecules[molIndex]) {
-                    frozenMolecules[molIndex].color = primaryColor;
+                    if (fillMode === 'interior' || fillMode === 'both') {
+                        frozenMolecules[molIndex].fillColor = primaryColor;
+                    }
+                    if (fillMode === 'edge' || fillMode === 'both') {
+                        frozenMolecules[molIndex].edgeColor = primaryColor;
+                    }
                 }
 
-                status.textContent = `Залито цветом ${primaryColor}`;
+                const modeText = fillMode === 'interior' ? 'внутренность' :
+                                 fillMode === 'edge' ? 'контур' : 'внутренность+контур';
+                status.textContent = `Залито ${modeText} цветом ${primaryColor}`;
             }
         });
 

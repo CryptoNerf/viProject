@@ -817,6 +817,121 @@
             }
         }
 
+        // === СИСТЕМА СЛИЯНИЯ МОЛЕКУЛ ===
+
+        // Проверяет, должны ли две молекулы слиться
+        function shouldMergeMolecules(mol1, mol2) {
+            // Не сливаем заблокированные или редактируемые молекулы
+            if (mol1.isLocked || mol2.isLocked) return false;
+            if (mol1.isEditing || mol2.isEditing) return false;
+
+            // Расстояние между центрами
+            const dx = mol2.x - mol1.x;
+            const dy = mol2.y - mol1.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Порог слияния: сумма размеров × 0.3
+            // СТРОГИЙ ПОРОГ: молекулы должны быть ОЧЕНЬ близко, почти полностью перекрываться
+            // При 0.3 центры молекул должны быть на расстоянии < 30% от суммы размеров
+            // Например, две молекулы по 100px: расстояние должно быть < 60px для слияния
+            const mergeThreshold = (mol1.size + mol2.size) * 0.3;
+
+            return distance < mergeThreshold;
+        }
+
+        // Сливает две молекулы в одну новую
+        function mergeMolecules(mol1, mol2) {
+            // Вычисляем веса на основе площади (size²)
+            const area1 = mol1.size * mol1.size;
+            const area2 = mol2.size * mol2.size;
+            const totalArea = area1 + area2;
+            const weight1 = area1 / totalArea;
+            const weight2 = area2 / totalArea;
+
+            // ПОЗИЦИЯ: Взвешенный центр масс
+            const newX = mol1.x * weight1 + mol2.x * weight2;
+            const newY = mol1.y * weight1 + mol2.y * weight2;
+
+            // РАЗМЕР: Сохраняем общую площадь
+            // newArea = area1 + area2
+            // newSize² = size1² + size2²
+            const newSize = Math.sqrt(area1 + area2);
+
+            // Создаём новую молекулу
+            const merged = new Molecule(newX, newY, newSize);
+
+            // ФОРМА: Взвешенное среднее деформаций
+            // Большая молекула имеет большее влияние на форму
+            merged.stretchX = mol1.stretchX * weight1 + mol2.stretchX * weight2;
+            merged.stretchY = mol1.stretchY * weight1 + mol2.stretchY * weight2;
+
+            // УГОЛ: Усредняем углы (учитываем периодичность)
+            // Переводим углы в векторы, усредняем, переводим обратно
+            const angle1X = Math.cos(mol1.deformAngle);
+            const angle1Y = Math.sin(mol1.deformAngle);
+            const angle2X = Math.cos(mol2.deformAngle);
+            const angle2Y = Math.sin(mol2.deformAngle);
+
+            const avgAngleX = angle1X * weight1 + angle2X * weight2;
+            const avgAngleY = angle1Y * weight1 + angle2Y * weight2;
+            merged.deformAngle = Math.atan2(avgAngleY, avgAngleX);
+
+            // СКОРОСТЬ: Усредняем (сохранение импульса)
+            merged.vx = mol1.vx * weight1 + mol2.vx * weight2;
+            merged.vy = mol1.vy * weight1 + mol2.vy * weight2;
+            merged.targetX = newX;
+            merged.targetY = newY;
+
+            // ЗВУК: Усредняем фазу
+            merged.audioPhase = (mol1.audioPhase + mol2.audioPhase) / 2;
+
+            return merged;
+        }
+
+        // Проверяет и выполняет слияния молекул
+        function checkAndMergeMolecules() {
+            let merged = false;
+
+            // Проходим по всем парам молекул
+            for (let i = 0; i < molecules.length; i++) {
+                for (let j = i + 1; j < molecules.length; j++) {
+                    const mol1 = molecules[i];
+                    const mol2 = molecules[j];
+
+                    if (shouldMergeMolecules(mol1, mol2)) {
+                        // Создаём новую объединённую молекулу
+                        const newMolecule = mergeMolecules(mol1, mol2);
+
+                        // Удаляем старые молекулы
+                        molecules.splice(j, 1); // Удаляем j сначала (больший индекс)
+                        molecules.splice(i, 1); // Потом i
+
+                        // Добавляем новую
+                        molecules.push(newMolecule);
+
+                        // Обновляем ссылки на молекулы если они были hovered
+                        if (hoveredMolecule === mol1 || hoveredMolecule === mol2) {
+                            hoveredMolecule = newMolecule;
+                        }
+                        if (lastHoveredMolecule === mol1 || lastHoveredMolecule === mol2) {
+                            lastHoveredMolecule = newMolecule;
+                        }
+                        // Примечание: editingMolecule не обновляем, т.к. редактируемые молекулы
+                        // не могут сливаться (см. shouldMergeMolecules)
+
+                        merged = true;
+                        break;
+                    }
+                }
+                if (merged) break; // Выходим из внешнего цикла
+            }
+
+            // Если произошло слияние, проверяем ещё раз (могут быть цепные слияния)
+            if (merged) {
+                checkAndMergeMolecules();
+            }
+        }
+
         // Инициализация аудио
         async function setupAudio() {
             console.log('Начинаем инициализацию аудио...');
@@ -1876,6 +1991,9 @@
 
             // Обновление молекул
             molecules.forEach(mol => mol.update());
+
+            // ПРОВЕРКА И СЛИЯНИЕ МОЛЕКУЛ
+            checkAndMergeMolecules();
 
             // ОТСЛЕЖИВАНИЕ МОЛЕКУЛЫ ПОД ЛАДОНЬЮ (для выбора при редактировании)
             hoveredMolecule = null;

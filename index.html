@@ -410,6 +410,161 @@
                 max-width: 200px;
             }
         }
+
+        /* === PAINT РЕЖИМ РЕДАКТОРА === */
+
+        /* Панель инструментов слева (как в старом Paint) */
+        #paintToolbar {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 60px;
+            background: #d4d0c8;
+            border: 2px outset #ffffff;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            padding: 5px;
+            display: none; /* Скрыто по умолчанию */
+            z-index: 15;
+        }
+
+        #paintToolbar.active {
+            display: block;
+        }
+
+        .paint-tool {
+            width: 24px;
+            height: 24px;
+            margin: 3px auto;
+            background: #c0c0c0;
+            border: 1px outset #ffffff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .paint-tool:hover {
+            background: #b0b0b0;
+        }
+
+        .paint-tool:active {
+            border-style: inset;
+        }
+
+        .paint-tool.selected {
+            border: 2px inset #ffffff;
+            background: #a0a0a0;
+        }
+
+        /* Палитра цветов внизу (как в Paint) */
+        #colorPalette {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #d4d0c8;
+            border: 2px outset #ffffff;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            padding: 10px;
+            display: none;
+            z-index: 15;
+        }
+
+        #colorPalette.active {
+            display: block;
+        }
+
+        #colorPalette .color-section {
+            margin-bottom: 8px;
+        }
+
+        #colorPalette .label-paint {
+            font-size: 10px;
+            color: #000;
+            font-family: 'MS Sans Serif', Arial, sans-serif;
+            margin-bottom: 4px;
+        }
+
+        #colorGrid {
+            display: grid;
+            grid-template-columns: repeat(14, 20px);
+            gap: 2px;
+        }
+
+        .color-swatch {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #000;
+            cursor: pointer;
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .color-swatch:hover {
+            border: 2px solid #fff;
+            box-shadow: 0 0 3px rgba(0,0,0,0.5);
+        }
+
+        .color-swatch.selected {
+            border: 3px solid #0000ff;
+        }
+
+        #currentColorDisplay {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .color-box {
+            width: 32px;
+            height: 32px;
+            border: 2px inset #ffffff;
+        }
+
+        .color-label {
+            font-size: 9px;
+            text-align: center;
+            margin-top: 2px;
+            color: #000;
+        }
+
+        /* Кнопка переключения режима - наследует стили от обычных кнопок */
+        #modeToggleBtn {
+            margin-top: 15px;
+        }
+
+        /* Индикатор текущего режима */
+        .mode-indicator {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 25px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            font-size: 16px;
+            font-weight: 600;
+            z-index: 16;
+            display: none;
+        }
+
+        .mode-indicator.active {
+            display: block;
+        }
+
+        .mode-indicator.gesture-mode {
+            background: rgba(200, 240, 200, 0.95);
+            color: #2d5a2d;
+            border: 2px solid #5a9a5a;
+        }
+
+        .mode-indicator.editor-mode {
+            background: rgba(255, 235, 180, 0.95);
+            color: #805500;
+            border: 2px solid #cc8800;
+        }
     </style>
 </head>
 <body>
@@ -466,6 +621,7 @@
 
             <button id="unlockBtn">Разблокировать все</button>
             <button id="clearBtn">Очистить все</button>
+            <button id="modeToggleBtn">🎨 Режим редактора</button>
         </div>
 
         <div class="toggle-btn" id="toggleControls" title="Показать панель">⚙️</div>
@@ -478,6 +634,40 @@
         <div class="loading" id="loading">
             <div>Инициализация...</div>
             <div style="font-size: 14px; margin-top: 10px;">Разрешите доступ к камере и микрофону</div>
+        </div>
+
+        <!-- Индикатор режима -->
+        <div class="mode-indicator gesture-mode active" id="modeIndicator">
+            👋 Режим жестов
+        </div>
+
+        <!-- Paint панель инструментов -->
+        <div id="paintToolbar">
+            <div class="paint-tool selected" data-tool="select" title="Выбор">🔍</div>
+            <div class="paint-tool" data-tool="fill" title="Заливка">🪣</div>
+            <div class="paint-tool" data-tool="pencil" title="Карандаш">✏️</div>
+            <div class="paint-tool" data-tool="eraser" title="Ластик">🧹</div>
+        </div>
+
+        <!-- Paint палитра цветов -->
+        <div id="colorPalette">
+            <div class="color-section">
+                <div class="label-paint">Цвета:</div>
+                <div id="colorGrid"></div>
+            </div>
+            <div class="color-section">
+                <div class="label-paint">Текущий:</div>
+                <div id="currentColorDisplay">
+                    <div>
+                        <div class="color-box" id="primaryColor" style="background: #000000;"></div>
+                        <div class="color-label">Основной</div>
+                    </div>
+                    <div>
+                        <div class="color-box" id="secondaryColor" style="background: #ffffff;"></div>
+                        <div class="color-label">Фоновый</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -504,6 +694,22 @@
         let editingMolecule = null; // Молекула в режиме редактирования
         let hoveredMolecule = null; // Молекула на которую наведена рука СЕЙЧАС
         let lastHoveredMolecule = null; // Последняя молекула на которую наводились
+
+        // === РЕЖИМ РЕДАКТОРА ===
+        let editorMode = false; // false = жесты, true = редактор
+        let frozenMolecules = []; // Замороженные молекулы для редактирования
+        let selectedMolecule = null; // Выбранная молекула в редакторе
+        let currentTool = 'select'; // Текущий инструмент (select, fill, pencil, eraser)
+        let primaryColor = '#000000'; // Основной цвет
+        let secondaryColor = '#ffffff'; // Фоновый цвет
+
+        // Палитра Paint (28 классических цветов)
+        const paintColors = [
+            '#000000', '#808080', '#800000', '#808000', '#008000', '#008080', '#000080', '#800080',
+            '#808000', '#FFFFFF', '#C0C0C0', '#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF',
+            '#FF00FF', '#FFFF80', '#80FFFF', '#FF8080', '#8080FF', '#FF80FF', '#804040', '#408080',
+            '#804080', '#408040', '#FF8040', '#80FF40'
+        ];
 
         // Сглаживание жестов - храним историю последних 5 кадров
         const GESTURE_HISTORY_SIZE = 5;
@@ -797,9 +1003,9 @@
                 const stretchedY = rotatedY / this.stretchY;
                 const distSq = stretchedX * stretchedX + stretchedY * stretchedY;
 
-                // Добавляем звуковую модуляцию
+                // Добавляем звуковую модуляцию (только в режиме жестов)
                 let audioMod = 1;
-                if (config.audioEnabled) {
+                if (config.audioEnabled && !editorMode) {
                     const angle = Math.atan2(dy, dx);
                     audioMod = 1 + Math.sin(angle * 3 + this.audioPhase) * audioLevel * config.audioSensitivity * 0.02;
                 }
@@ -993,25 +1199,37 @@
         function drawMetaballs() {
             if (molecules.length === 0) return;
 
-            // Создаем сетку значений потенциала
+            // Создаем сетку значений потенциала И доминирующих молекул
             const cols = Math.ceil(width / gridResolution) + 1;
             const rows = Math.ceil(height / gridResolution) + 1;
             const field = [];
+            const dominantMolecule = []; // Молекула с наибольшим влиянием в каждой точке
 
-            // Вычисляем поле влияния
+            // Вычисляем поле влияния и доминирующие молекулы
             for (let i = 0; i < rows; i++) {
                 field[i] = [];
+                dominantMolecule[i] = [];
                 for (let j = 0; j < cols; j++) {
                     const x = j * gridResolution;
                     const y = i * gridResolution;
                     let sum = 0;
+                    let maxInfluence = 0;
+                    let dominantMol = null;
 
-                    // Суммируем влияние всех молекул
+                    // Суммируем влияние всех молекул и находим доминирующую
                     for (const mol of molecules) {
-                        sum += mol.getInfluence(x, y);
+                        const influence = mol.getInfluence(x, y);
+                        sum += influence;
+
+                        // Запоминаем молекулу с наибольшим влиянием
+                        if (influence > maxInfluence) {
+                            maxInfluence = influence;
+                            dominantMol = mol;
+                        }
                     }
 
                     field[i][j] = sum;
+                    dominantMolecule[i][j] = dominantMol;
                 }
             }
 
@@ -1040,14 +1258,18 @@
 
                     if (cellIndex === 0 || cellIndex === 15) continue;
 
-                    // Рисуем контур для этой ячейки
-                    drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold);
+                    // Определяем цвет для этой ячейки (по доминирующей молекуле в центре)
+                    const centerMol = dominantMolecule[i][j];
+                    const cellColor = (centerMol && centerMol.color) ? centerMol.color : '#f5f5f5';
+
+                    // Рисуем ячейку с заливкой и контуром
+                    drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold, cellColor);
                 }
             }
         }
 
         // Отрисовка одной ячейки marching squares
-        function drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold) {
+        function drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold, fillColor) {
             const size = gridResolution;
 
             // Интерполяция позиций на гранях
@@ -1090,6 +1312,64 @@
 
             if (!lines[cellIndex]) return;
 
+            // Если есть цвет - сначала заливаем область
+            if (fillColor && fillColor !== '#f5f5f5') {
+                ctx.fillStyle = fillColor;
+
+                // Создаём замкнутый путь для заливки на основе конфигурации
+                // Упрощённый подход: заливаем прямоугольную ячейку для заполненных областей
+                const corners = [
+                    { x: x, y: y },           // tl
+                    { x: x + size, y: y },     // tr
+                    { x: x + size, y: y + size }, // br
+                    { x: x, y: y + size }      // bl
+                ];
+
+                const tl = field[i][j] >= threshold;
+                const tr = field[i][j + 1] >= threshold;
+                const br = field[i + 1][j + 1] >= threshold;
+                const bl = field[i + 1][j] >= threshold;
+
+                // Создаём путь заливки в зависимости от конфигурации
+                ctx.beginPath();
+
+                // Для упрощения: если хотя бы 2 угла внутри - заливаем всю ячейку
+                const filledCorners = [tl, tr, br, bl].filter(Boolean).length;
+                if (filledCorners >= 2) {
+                    // Заливаем всю ячейку
+                    ctx.fillRect(x, y, size, size);
+                } else if (filledCorners > 0) {
+                    // Частичная заливка - создаём полигон
+                    const points = [];
+
+                    // Добавляем точки на рёбрах
+                    for (const [e1, e2] of lines[cellIndex]) {
+                        const p1 = getEdgePoint(e1);
+                        const p2 = getEdgePoint(e2);
+                        points.push(p1, p2);
+                    }
+
+                    // Добавляем заполненные углы
+                    if (tl) points.push(corners[0]);
+                    if (tr) points.push(corners[1]);
+                    if (br) points.push(corners[2]);
+                    if (bl) points.push(corners[3]);
+
+                    // Рисуем полигон
+                    if (points.length > 0) {
+                        ctx.moveTo(points[0].x, points[0].y);
+                        for (let k = 1; k < points.length; k++) {
+                            ctx.lineTo(points[k].x, points[k].y);
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Рисуем контур поверх
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 2.5;
             ctx.beginPath();
             for (const [e1, e2] of lines[cellIndex]) {
                 const p1 = getEdgePoint(e1);
@@ -1899,8 +2179,8 @@
                 ctx.clearRect(0, 0, width, height);
             }
 
-            // Анализируем звук
-            if (config.audioEnabled) {
+            // Анализируем звук (только в режиме жестов)
+            if (config.audioEnabled && !editorMode) {
                 analyzeAudio();
             }
 
@@ -1989,11 +2269,13 @@
                 });
             }
 
-            // Обновление молекул
-            molecules.forEach(mol => mol.update());
+            // Обновление молекул (только в режиме жестов)
+            if (!editorMode) {
+                molecules.forEach(mol => mol.update());
 
-            // ПРОВЕРКА И СЛИЯНИЕ МОЛЕКУЛ
-            checkAndMergeMolecules();
+                // ПРОВЕРКА И СЛИЯНИЕ МОЛЕКУЛ
+                checkAndMergeMolecules();
+            }
 
             // ОТСЛЕЖИВАНИЕ МОЛЕКУЛЫ ПОД ЛАДОНЬЮ (для выбора при редактировании)
             hoveredMolecule = null;
@@ -2303,6 +2585,29 @@
                     ctx.strokeText(hintText, mol.x, mol.y + 35);
                     ctx.fillText(hintText, mol.x, mol.y + 35);
                 }
+
+                // PAINT РЕДАКТОР: Подсветка выбранной молекулы
+                if (editorMode && mol === selectedMolecule) {
+                    // Оранжевый пульсирующий контур
+                    const pulse = 0.6 + Math.sin(Date.now() / 200) * 0.3;
+                    ctx.strokeStyle = `rgba(255, 165, 0, ${pulse})`;
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([8, 4]);
+                    ctx.beginPath();
+                    ctx.arc(mol.x, mol.y, mol.size * 1.1, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Метка "ВЫБРАНА"
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillStyle = 'rgba(255, 165, 0, 0.9)';
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+                    ctx.lineWidth = 3;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.strokeText('ВЫБРАНА', mol.x, mol.y - mol.size - 10);
+                    ctx.fillText('ВЫБРАНА', mol.x, mol.y - mol.size - 10);
+                }
             });
 
             // Визуализация рук
@@ -2512,9 +2817,159 @@
             }, 10000); // 10 секунд
         }
 
+        // === PAINT РЕЖИМ РЕДАКТОРА - UI ===
+
+        // Инициализация палитры цветов
+        function initColorPalette() {
+            const colorGrid = document.getElementById('colorGrid');
+            paintColors.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch';
+                swatch.style.background = color;
+                swatch.dataset.color = color;
+
+                swatch.addEventListener('click', (e) => {
+                    // Левая кнопка - основной цвет, правая - фоновый
+                    if (e.button === 0) {
+                        primaryColor = color;
+                        document.getElementById('primaryColor').style.background = color;
+
+                        // Снимаем выделение со всех
+                        document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+                        swatch.classList.add('selected');
+                    }
+                });
+
+                swatch.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    secondaryColor = color;
+                    document.getElementById('secondaryColor').style.background = color;
+                });
+
+                colorGrid.appendChild(swatch);
+            });
+        }
+
+        // Переключение режима
+        function toggleEditorMode() {
+            editorMode = !editorMode;
+
+            const modeBtn = document.getElementById('modeToggleBtn');
+            const modeIndicator = document.getElementById('modeIndicator');
+            const paintToolbar = document.getElementById('paintToolbar');
+            const colorPalette = document.getElementById('colorPalette');
+            const controlsPanel = document.getElementById('controls');
+            const gestureHint = document.getElementById('gestureHint');
+
+            if (editorMode) {
+                // Переход в режим редактора
+                modeBtn.textContent = '👋 Режим жестов';
+
+                modeIndicator.textContent = '🎨 Режим редактора';
+                modeIndicator.className = 'mode-indicator editor-mode active';
+
+                paintToolbar.classList.add('active');
+                colorPalette.classList.add('active');
+
+                // Скрываем только подсказки жестов, панель controls оставляем
+                gestureHint.classList.add('minimized');
+
+                // Замораживаем текущее состояние молекул
+                frozenMolecules = molecules.map(mol => ({
+                    x: mol.x,
+                    y: mol.y,
+                    size: mol.size,
+                    stretchX: mol.stretchX,
+                    stretchY: mol.stretchY,
+                    deformAngle: mol.deformAngle,
+                    color: mol.color || null // Сохраняем цвет если есть
+                }));
+
+                status.textContent = `Режим редактора | Молекул: ${molecules.length}`;
+            } else {
+                // Возврат в режим жестов
+                modeBtn.textContent = '🎨 Режим редактора';
+
+                modeIndicator.textContent = '👋 Режим жестов';
+                modeIndicator.className = 'mode-indicator gesture-mode active';
+
+                paintToolbar.classList.remove('active');
+                colorPalette.classList.remove('active');
+
+                selectedMolecule = null;
+
+                // Применяем изменённые цвета обратно к молекулам
+                frozenMolecules.forEach((frozen, i) => {
+                    if (molecules[i]) {
+                        molecules[i].color = frozen.color;
+                    }
+                });
+
+                status.textContent = 'Режим жестов | Готов';
+            }
+        }
+
+        // Обработчик кнопки переключения режима
+        document.getElementById('modeToggleBtn').addEventListener('click', toggleEditorMode);
+
+        // Выбор инструмента
+        document.querySelectorAll('.paint-tool').forEach(tool => {
+            tool.addEventListener('click', () => {
+                document.querySelectorAll('.paint-tool').forEach(t => t.classList.remove('selected'));
+                tool.classList.add('selected');
+                currentTool = tool.dataset.tool;
+            });
+        });
+
+        // Клик на canvas в режиме редактора
+        canvas.addEventListener('click', (e) => {
+            if (!editorMode) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const clickX = (e.clientX - rect.left) * scaleX;
+            const clickY = (e.clientY - rect.top) * scaleY;
+
+            // Находим молекулу под курсором
+            let clickedMolecule = null;
+            for (let i = molecules.length - 1; i >= 0; i--) {
+                const mol = molecules[i];
+                const dx = clickX - mol.x;
+                const dy = clickY - mol.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < mol.size) {
+                    clickedMolecule = mol;
+                    break;
+                }
+            }
+
+            if (currentTool === 'select') {
+                selectedMolecule = clickedMolecule;
+                status.textContent = clickedMolecule ?
+                    `Выбрана молекула (${clickedMolecule.size.toFixed(0)}px)` :
+                    'Нет выбранной молекулы';
+            } else if (currentTool === 'fill' && clickedMolecule) {
+                // Заливка цветом
+                clickedMolecule.color = primaryColor;
+
+                // Обновляем замороженное состояние
+                const molIndex = molecules.indexOf(clickedMolecule);
+                if (frozenMolecules[molIndex]) {
+                    frozenMolecules[molIndex].color = primaryColor;
+                }
+
+                status.textContent = `Залито цветом ${primaryColor}`;
+            }
+        });
+
         // Инициализация
         async function init() {
             console.log('=== НАЧАЛО ИНИЦИАЛИЗАЦИИ ===');
+
+            // Инициализируем палитру цветов Paint
+            initColorPalette();
 
             resize();
             window.addEventListener('resize', resize);

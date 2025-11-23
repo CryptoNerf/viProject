@@ -906,6 +906,47 @@
         // Параметры метаболлов
         const gridResolution = 15; // Разрешение сетки для marching squares
 
+        // Пространственное разбиение для оптимизации (Spatial Hashing)
+        const spatialCellSize = 150; // Размер ячейки пространственной сетки (должен быть >= максимального радиуса влияния молекулы)
+        let spatialHash = new Map(); // Хеш-таблица: ключ = "x,y" координаты ячейки, значение = массив молекул
+
+        // Функция построения пространственного хеша
+        function buildSpatialHash() {
+            spatialHash.clear();
+
+            for (const mol of molecules) {
+                // Вычисляем радиус влияния молекулы с учётом растяжения
+                // Для вытянутых молекул радиус влияния больше
+                const maxStretch = Math.max(mol.stretchX || 1, mol.stretchY || 1);
+                const influenceRadius = mol.size * maxStretch * 2.5; // Запас для вытянутых молекул
+
+                // Находим все ячейки, которые могут быть затронуты этой молекулой
+                const minCellX = Math.floor((mol.x - influenceRadius) / spatialCellSize);
+                const maxCellX = Math.floor((mol.x + influenceRadius) / spatialCellSize);
+                const minCellY = Math.floor((mol.y - influenceRadius) / spatialCellSize);
+                const maxCellY = Math.floor((mol.y + influenceRadius) / spatialCellSize);
+
+                // Добавляем молекулу во все затронутые ячейки
+                for (let cy = minCellY; cy <= maxCellY; cy++) {
+                    for (let cx = minCellX; cx <= maxCellX; cx++) {
+                        const key = `${cx},${cy}`;
+                        if (!spatialHash.has(key)) {
+                            spatialHash.set(key, []);
+                        }
+                        spatialHash.get(key).push(mol);
+                    }
+                }
+            }
+        }
+
+        // Функция получения молекул, которые могут влиять на точку (x, y)
+        function getNearbyMolecules(x, y) {
+            const cellX = Math.floor(x / spatialCellSize);
+            const cellY = Math.floor(y / spatialCellSize);
+            const key = `${cellX},${cellY}`;
+            return spatialHash.get(key) || [];
+        }
+
         // Класс молекулы (метабол)
         class Molecule {
             constructor(x, y, size) {
@@ -1485,6 +1526,11 @@
 
             if (molecules.length === 0) return;
 
+            // Строим пространственный хеш для оптимизации
+            const spatialHashStartTime = performance.now();
+            buildSpatialHash();
+            const spatialHashTime = performance.now() - spatialHashStartTime;
+
             // Создаем сетку значений потенциала И доминирующих молекул
             const cols = Math.ceil(width / gridResolution) + 1;
             const rows = Math.ceil(height / gridResolution) + 1;
@@ -1502,8 +1548,9 @@
                     let maxInfluence = 0;
                     let dominantMol = null;
 
-                    // Суммируем влияние всех молекул и находим доминирующую
-                    for (const mol of molecules) {
+                    // Суммируем влияние только близких молекул (пространственная оптимизация)
+                    const nearbyMolecules = getNearbyMolecules(x, y);
+                    for (const mol of nearbyMolecules) {
                         const influence = mol.getInfluence(x, y);
                         sum += influence;
 
@@ -1536,7 +1583,9 @@
                     let maxInfluence = 0;
                     let dominantMol = null;
 
-                    for (const mol of molecules) {
+                    // Используем пространственную оптимизацию
+                    const nearbyMolecules = getNearbyMolecules(px, py);
+                    for (const mol of nearbyMolecules) {
                         const influence = mol.getInfluence(px, py);
                         totalInfluence += influence;
 
@@ -2564,6 +2613,12 @@
                 gestureHistory.shift(); // Удаляем старые кадры
             }
         }
+
+        // Логирование информации о браузере для отладки
+        console.log('Информация о браузере:');
+        console.log('  crossOriginIsolated:', window.crossOriginIsolated);
+        console.log('  SharedArrayBuffer:', typeof SharedArrayBuffer !== 'undefined');
+        console.log('  Браузер:', navigator.userAgent);
 
         // Инициализация MediaPipe Hands
         console.log('Инициализация MediaPipe Hands...');

@@ -702,6 +702,18 @@
                     <button class="fill-mode-btn" data-mode="edge" title="Только контур">Контур</button>
                 </div>
             </div>
+            <div class="color-section">
+                <div class="label-paint">Фон:</div>
+                <div style="display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;">
+                    <input type="color" id="bgColorPicker" value="#ffffff" title="Цвет фона" style="width: 50px; height: 30px; border: 2px outset #fff; cursor: pointer;">
+                    <label class="fill-mode-btn" style="padding: 4px 8px; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">
+                        Файл
+                        <input type="file" id="bgFilePicker" accept="image/*,video/*" style="display: none;">
+                    </label>
+                    <button class="fill-mode-btn" id="bgClearBtn" title="Очистить фон">✖</button>
+                </div>
+                <div id="bgPreview" style="margin-top: 5px; font-size: 10px; color: #666;"></div>
+            </div>
         </div>
     </div>
 
@@ -733,10 +745,16 @@
         let editorMode = false; // false = жесты, true = редактор
         let frozenMolecules = []; // Замороженные молекулы для редактирования
         let selectedMolecule = null; // Выбранная молекула в редакторе
+        let hoveredMoleculeEditor = null; // Молекула под курсором в редакторе
         let currentTool = 'select'; // Текущий инструмент (select, fill, pencil, eraser)
         let primaryColor = '#000000'; // Основной цвет
         let secondaryColor = '#ffffff'; // Фоновый цвет
         let fillMode = 'both'; // Режим заливки: 'interior' (внутренность), 'edge' (контур), 'both' (оба)
+
+        // Фон
+        let backgroundColor = '#ffffff'; // Цвет фона
+        let backgroundImage = null; // Изображение фона (Image или video элемент)
+        let backgroundType = 'color'; // 'color', 'image', 'video'
 
         // Палитра Paint (28 классических цветов)
         const paintColors = [
@@ -1325,6 +1343,61 @@
 
         // Рисование метаболлов через marching squares
         function drawMetaballs() {
+            // НУЛЕВОЙ СЛОЙ: Фон (рисуется только если НЕ включено "показать видео")
+            // В режиме "показать видео" фон уже нарисован в animate() - это видео с камеры
+            if (!config.showVideo) {
+                if (backgroundType === 'color') {
+                    // Цветной фон
+                    ctx.fillStyle = backgroundColor;
+                    ctx.fillRect(0, 0, width, height);
+                } else if (backgroundType === 'image' && backgroundImage) {
+                    // Изображение фона
+                    // Масштабируем чтобы покрыть весь canvas (cover)
+                    const imgAspect = backgroundImage.width / backgroundImage.height;
+                    const canvasAspect = width / height;
+                    let drawWidth, drawHeight, offsetX, offsetY;
+
+                    if (imgAspect > canvasAspect) {
+                        // Изображение шире
+                        drawHeight = height;
+                        drawWidth = height * imgAspect;
+                        offsetX = (width - drawWidth) / 2;
+                        offsetY = 0;
+                    } else {
+                        // Изображение выше
+                        drawWidth = width;
+                        drawHeight = width / imgAspect;
+                        offsetX = 0;
+                        offsetY = (height - drawHeight) / 2;
+                    }
+
+                    ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+                } else if (backgroundType === 'video' && backgroundImage) {
+                    // Видео фон (аналогично изображению)
+                    const vidAspect = backgroundImage.videoWidth / backgroundImage.videoHeight;
+                    const canvasAspect = width / height;
+                    let drawWidth, drawHeight, offsetX, offsetY;
+
+                    if (vidAspect > canvasAspect) {
+                        drawHeight = height;
+                        drawWidth = height * vidAspect;
+                        offsetX = (width - drawWidth) / 2;
+                        offsetY = 0;
+                    } else {
+                        drawWidth = width;
+                        drawHeight = width / vidAspect;
+                        offsetX = 0;
+                        offsetY = (height - drawHeight) / 2;
+                    }
+
+                    ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+                } else {
+                    // Фон по умолчанию - белый
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, width, height);
+                }
+            }
+
             if (molecules.length === 0) return;
 
             // Создаем сетку значений потенциала И доминирующих молекул
@@ -1421,6 +1494,39 @@
 
                     // Рисуем ячейку с блочной заливкой контура
                     drawMarchingSquareCell(x, y, cellIndex, field, i, j, threshold, cellEdgeColor);
+                }
+            }
+
+            // ТРЕТИЙ СЛОЙ: Подсветка молекулы при наведении в режиме редактора
+            if (editorMode && hoveredMoleculeEditor && (currentTool === 'fill' || currentTool === 'eraser')) {
+                const mol = hoveredMoleculeEditor;
+
+                // Рисуем подсветку по контуру молекулы
+                ctx.save();
+                ctx.translate(mol.x, mol.y);
+                ctx.rotate(mol.deformAngle);
+
+                // Полупрозрачная подсветка
+                ctx.strokeStyle = currentTool === 'fill' ? 'rgba(0, 150, 255, 0.8)' : 'rgba(255, 100, 100, 0.8)';
+                ctx.lineWidth = 4;
+                ctx.setLineDash([10, 5]);
+
+                // Рисуем эллипс подсветки
+                ctx.beginPath();
+                ctx.ellipse(0, 0, mol.size * mol.stretchX, mol.size * mol.stretchY, 0, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.setLineDash([]);
+                ctx.restore();
+
+                // Подсказка о режиме заливки
+                if (currentTool === 'fill') {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.font = '14px Arial';
+                    const hint = fillMode === 'interior' ? '🪣 Внутренность' :
+                                 fillMode === 'edge' ? '🪣 Контур' : '🪣 Оба';
+                    const metrics = ctx.measureText(hint);
+                    ctx.fillText(hint, mol.x - metrics.width / 2, mol.y - mol.size - 10);
                 }
             }
         }
@@ -2291,13 +2397,17 @@
 
         // Основной цикл анимации
         function animate() {
-            // Белый фон (если видео не показывается, иначе прозрачный)
-            if (!config.showVideo) {
-                ctx.fillStyle = '#f5f5f5';
-                ctx.fillRect(0, 0, width, height);
-            } else {
-                // Очищаем canvas для прозрачности
-                ctx.clearRect(0, 0, width, height);
+            // Очищаем canvas в начале каждого кадра
+            // Это предотвращает наложение старых кадров (баг с прозрачным PNG)
+            ctx.clearRect(0, 0, width, height);
+
+            // Если включено "показать видео" - рисуем видео с камеры как фон
+            if (config.showVideo && video.videoWidth > 0) {
+                ctx.save();
+                // Отзеркаливаем видео
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, -width, 0, width, height);
+                ctx.restore();
             }
 
             // Анализируем звук (только в режиме жестов)
@@ -3047,11 +3157,104 @@
         // Выбор режима заливки
         document.querySelectorAll('.fill-mode-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.fill-mode-btn').forEach(b => b.classList.remove('active'));
+                // Игнорируем кнопки без data-mode (например, кнопки фона)
+                if (!btn.dataset.mode) return;
+
+                document.querySelectorAll('.fill-mode-btn').forEach(b => {
+                    if (b.dataset.mode) b.classList.remove('active');
+                });
                 btn.classList.add('active');
                 fillMode = btn.dataset.mode;
                 status.textContent = `Режим заливки: ${btn.textContent}`;
             });
+        });
+
+        // Выбор цвета фона
+        document.getElementById('bgColorPicker').addEventListener('input', (e) => {
+            backgroundColor = e.target.value;
+            backgroundType = 'color';
+            backgroundImage = null;
+            document.getElementById('bgPreview').textContent = `Цвет: ${backgroundColor}`;
+            status.textContent = `Фон: цвет ${backgroundColor}`;
+        });
+
+        // Загрузка файла для фона
+        document.getElementById('bgFilePicker').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const url = URL.createObjectURL(file);
+            const fileType = file.type;
+
+            if (fileType.startsWith('image/')) {
+                // Загружаем изображение
+                const img = new Image();
+                img.onload = () => {
+                    backgroundImage = img;
+                    backgroundType = 'image';
+                    document.getElementById('bgPreview').textContent = `Изображение: ${file.name}`;
+                    status.textContent = `Фон: ${file.name}`;
+                };
+                img.src = url;
+            } else if (fileType.startsWith('video/')) {
+                // Загружаем видео
+                const video = document.createElement('video');
+                video.src = url;
+                video.loop = true;
+                video.muted = true;
+                video.playsInline = true;
+                video.play().then(() => {
+                    backgroundImage = video;
+                    backgroundType = 'video';
+                    document.getElementById('bgPreview').textContent = `Видео: ${file.name}`;
+                    status.textContent = `Фон: ${file.name}`;
+                }).catch(err => {
+                    console.error('Ошибка воспроизведения видео:', err);
+                    status.textContent = 'Ошибка загрузки видео';
+                });
+            }
+        });
+
+        // Очистка фона
+        document.getElementById('bgClearBtn').addEventListener('click', () => {
+            backgroundColor = '#ffffff';
+            backgroundImage = null;
+            backgroundType = 'color';
+            document.getElementById('bgColorPicker').value = '#ffffff';
+            document.getElementById('bgPreview').textContent = '';
+            status.textContent = 'Фон очищен (белый)';
+        });
+
+        // Движение мыши в режиме редактора - для подсветки
+        canvas.addEventListener('mousemove', (e) => {
+            if (!editorMode) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
+
+            // Находим молекулу под курсором
+            hoveredMoleculeEditor = null;
+            for (let i = molecules.length - 1; i >= 0; i--) {
+                const mol = molecules[i];
+                const dx = mouseX - mol.x;
+                const dy = mouseY - mol.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < mol.size) {
+                    hoveredMoleculeEditor = mol;
+                    break;
+                }
+            }
+
+            // Меняем курсор
+            if (currentTool === 'fill' || currentTool === 'eraser') {
+                canvas.style.cursor = hoveredMoleculeEditor ? 'pointer' : 'crosshair';
+            } else if (currentTool === 'select') {
+                canvas.style.cursor = hoveredMoleculeEditor ? 'pointer' : 'default';
+            }
         });
 
         // Клик на canvas в режиме редактора
@@ -3064,19 +3267,8 @@
             const clickX = (e.clientX - rect.left) * scaleX;
             const clickY = (e.clientY - rect.top) * scaleY;
 
-            // Находим молекулу под курсором
-            let clickedMolecule = null;
-            for (let i = molecules.length - 1; i >= 0; i--) {
-                const mol = molecules[i];
-                const dx = clickX - mol.x;
-                const dy = clickY - mol.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-
-                if (dist < mol.size) {
-                    clickedMolecule = mol;
-                    break;
-                }
-            }
+            // Находим молекулу под курсором (используем hoveredMoleculeEditor для точности)
+            let clickedMolecule = hoveredMoleculeEditor;
 
             if (currentTool === 'select') {
                 selectedMolecule = clickedMolecule;
@@ -3106,6 +3298,29 @@
                 const modeText = fillMode === 'interior' ? 'внутренность' :
                                  fillMode === 'edge' ? 'контур' : 'внутренность+контур';
                 status.textContent = `Залито ${modeText} цветом ${primaryColor}`;
+            } else if (currentTool === 'eraser' && clickedMolecule) {
+                // Ластик удаляет заливку в зависимости от режима
+                if (fillMode === 'interior' || fillMode === 'both') {
+                    clickedMolecule.fillColor = null;
+                }
+                if (fillMode === 'edge' || fillMode === 'both') {
+                    clickedMolecule.edgeColor = null;
+                }
+
+                // Обновляем замороженное состояние
+                const molIndex = molecules.indexOf(clickedMolecule);
+                if (frozenMolecules[molIndex]) {
+                    if (fillMode === 'interior' || fillMode === 'both') {
+                        frozenMolecules[molIndex].fillColor = null;
+                    }
+                    if (fillMode === 'edge' || fillMode === 'both') {
+                        frozenMolecules[molIndex].edgeColor = null;
+                    }
+                }
+
+                const modeText = fillMode === 'interior' ? 'внутренность' :
+                                 fillMode === 'edge' ? 'контур' : 'внутренность+контур';
+                status.textContent = `Стёрто ${modeText}`;
             }
         });
 

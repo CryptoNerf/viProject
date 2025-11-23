@@ -797,6 +797,11 @@
         let backgroundImage = null; // Изображение фона (Image или video элемент)
         let backgroundType = 'color'; // 'color', 'image', 'video'
 
+        // Кеширование фона для производительности
+        let backgroundCache = null; // OffscreenCanvas для кеширования фона
+        let backgroundCacheCtx = null;
+        let backgroundCacheValid = false; // Флаг валидности кеша
+
         // Палитра Paint (28 классических цветов)
         const paintColors = [
             '#000000', '#808080', '#800000', '#808000', '#008000', '#008080', '#000080', '#800080',
@@ -921,6 +926,11 @@
                 // Угол деформации (для растяжения под углом)
                 this.deformAngle = 0;
 
+                // Кеширование тригонометрии для производительности
+                this._cachedCos = 1; // cos(0)
+                this._cachedSin = 0; // sin(0)
+                this._lastCachedAngle = 0;
+
                 // Для визуализации - позиции рук в режиме редактирования
                 this.editingHands = null; // { hand1: {x, y}, hand2: {x, y} }
 
@@ -943,6 +953,10 @@
                 this.stripeColor2 = '#0000ff'; // Цвет 2 для градиента полосок
                 this.stripeWidth = 2; // Ширина полосок
                 this.stripeSpacing = 3; // Расстояние между полосками
+
+                // Кеш градиентов для производительности
+                this._gradientCache = null;
+                this._gradientCacheKey = null;
 
                 // Стабилизация формы - счетчик кадров с двумя руками
                 this.twoHandsFrameCount = 0; // Сколько кадров подряд видим 2 руки
@@ -1110,11 +1124,16 @@
                 const dx = px - this.x;
                 const dy = py - this.y;
 
-                // Поворачиваем координаты на угол деформации (обратный поворот)
-                const cos = Math.cos(-this.deformAngle);
-                const sin = Math.sin(-this.deformAngle);
-                const rotatedX = dx * cos - dy * sin;
-                const rotatedY = dx * sin + dy * cos;
+                // Обновляем кеш тригонометрии если угол изменился
+                if (this.deformAngle !== this._lastCachedAngle) {
+                    this._cachedCos = Math.cos(-this.deformAngle);
+                    this._cachedSin = Math.sin(-this.deformAngle);
+                    this._lastCachedAngle = this.deformAngle;
+                }
+
+                // Используем кешированные значения
+                const rotatedX = dx * this._cachedCos - dy * this._cachedSin;
+                const rotatedY = dx * this._cachedSin + dy * this._cachedCos;
 
                 // Применяем растяжение в повёрнутой системе координат
                 const stretchedX = rotatedX / this.stretchX;
@@ -1391,39 +1410,52 @@
             });
         }
 
+        // Функция для кеширования статического фона (цвет или изображение)
+        function renderBackgroundToCache() {
+            // Создаём OffscreenCanvas если ещё не создан или изменился размер
+            if (!backgroundCache || backgroundCache.width !== width || backgroundCache.height !== height) {
+                backgroundCache = new OffscreenCanvas(width, height);
+                backgroundCacheCtx = backgroundCache.getContext('2d');
+            }
+
+            // Рендерим фон в кеш
+            if (backgroundType === 'color') {
+                backgroundCacheCtx.fillStyle = backgroundColor;
+                backgroundCacheCtx.fillRect(0, 0, width, height);
+            } else if (backgroundType === 'image' && backgroundImage) {
+                const imgAspect = backgroundImage.width / backgroundImage.height;
+                const canvasAspect = width / height;
+                let drawWidth, drawHeight, offsetX, offsetY;
+
+                if (imgAspect > canvasAspect) {
+                    drawHeight = height;
+                    drawWidth = height * imgAspect;
+                    offsetX = (width - drawWidth) / 2;
+                    offsetY = 0;
+                } else {
+                    drawWidth = width;
+                    drawHeight = width / imgAspect;
+                    offsetX = 0;
+                    offsetY = (height - drawHeight) / 2;
+                }
+
+                backgroundCacheCtx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+            } else {
+                // Белый фон по умолчанию
+                backgroundCacheCtx.fillStyle = '#ffffff';
+                backgroundCacheCtx.fillRect(0, 0, width, height);
+            }
+
+            backgroundCacheValid = true;
+        }
+
         // Рисование метаболлов через marching squares
         function drawMetaballs() {
             // НУЛЕВОЙ СЛОЙ: Фон (рисуется только если НЕ включено "показать видео")
             // В режиме "показать видео" фон уже нарисован в animate() - это видео с камеры
             if (!config.showVideo) {
-                if (backgroundType === 'color') {
-                    // Цветной фон
-                    ctx.fillStyle = backgroundColor;
-                    ctx.fillRect(0, 0, width, height);
-                } else if (backgroundType === 'image' && backgroundImage) {
-                    // Изображение фона
-                    // Масштабируем чтобы покрыть весь canvas (cover)
-                    const imgAspect = backgroundImage.width / backgroundImage.height;
-                    const canvasAspect = width / height;
-                    let drawWidth, drawHeight, offsetX, offsetY;
-
-                    if (imgAspect > canvasAspect) {
-                        // Изображение шире
-                        drawHeight = height;
-                        drawWidth = height * imgAspect;
-                        offsetX = (width - drawWidth) / 2;
-                        offsetY = 0;
-                    } else {
-                        // Изображение выше
-                        drawWidth = width;
-                        drawHeight = width / imgAspect;
-                        offsetX = 0;
-                        offsetY = (height - drawHeight) / 2;
-                    }
-
-                    ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
-                } else if (backgroundType === 'video' && backgroundImage) {
-                    // Видео фон (аналогично изображению)
+                if (backgroundType === 'video' && backgroundImage) {
+                    // Видео фон рендерим каждый кадр (не кешируем)
                     const vidAspect = backgroundImage.videoWidth / backgroundImage.videoHeight;
                     const canvasAspect = width / height;
                     let drawWidth, drawHeight, offsetX, offsetY;
@@ -1442,9 +1474,12 @@
 
                     ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
                 } else {
-                    // Фон по умолчанию - белый
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, width, height);
+                    // Для статического фона используем кеш
+                    if (!backgroundCacheValid) {
+                        renderBackgroundToCache();
+                    }
+                    // Просто копируем закешированный фон
+                    ctx.drawImage(backgroundCache, 0, 0);
                 }
             }
 
@@ -1714,14 +1749,38 @@
 
                     if (minX === Infinity) continue;
 
-                    // Парсим цвета
-                    const r1 = parseInt(color1.slice(1, 3), 16);
-                    const g1 = parseInt(color1.slice(3, 5), 16);
-                    const b1 = parseInt(color1.slice(5, 7), 16);
+                    // Кешируем вычисление цветов для остановок градиента
+                    const cacheKey = `${color1}_${color2}`;
+                    let colorStops;
 
-                    const r2 = parseInt(color2.slice(1, 3), 16);
-                    const g2 = parseInt(color2.slice(3, 5), 16);
-                    const b2 = parseInt(color2.slice(5, 7), 16);
+                    if (mol._gradientCacheKey === cacheKey && mol._gradientCache) {
+                        // Используем кешированные цвета
+                        colorStops = mol._gradientCache;
+                    } else {
+                        // Вычисляем цвета для остановок
+                        const r1 = parseInt(color1.slice(1, 3), 16);
+                        const g1 = parseInt(color1.slice(3, 5), 16);
+                        const b1 = parseInt(color1.slice(5, 7), 16);
+
+                        const r2 = parseInt(color2.slice(1, 3), 16);
+                        const g2 = parseInt(color2.slice(3, 5), 16);
+                        const b2 = parseInt(color2.slice(5, 7), 16);
+
+                        // Предвычисляем все цвета для остановок
+                        const numStops = 10;
+                        colorStops = [];
+                        for (let i = 0; i <= numStops; i++) {
+                            const t = i / numStops;
+                            const baseR = r1 + (r2 - r1) * t;
+                            const baseG = g1 + (g2 - g1) * t;
+                            const baseB = b1 + (b2 - b1) * t;
+                            colorStops.push({ t, baseR, baseG, baseB });
+                        }
+
+                        // Сохраняем в кеш
+                        mol._gradientCache = colorStops;
+                        mol._gradientCacheKey = cacheKey;
+                    }
 
                     // Создаем маску для молекулы
                     ctx.save();
@@ -1754,24 +1813,16 @@
                         // Создаем градиент для каждой полоски от color1 к color2
                         const gradient = ctx.createLinearGradient(x, minY, x, maxY);
 
-                        // Генерируем плавный переход между двумя цветами с вариациями
-                        const numStops = 10;
-                        for (let i = 0; i <= numStops; i++) {
-                            const t = i / numStops;
-
-                            // Линейная интерполяция между color1 и color2
-                            const baseR = r1 + (r2 - r1) * t;
-                            const baseG = g1 + (g2 - g1) * t;
-                            const baseB = b1 + (b2 - b1) * t;
-
+                        // Используем закешированные цвета остановок
+                        for (const stop of colorStops) {
                             // Добавляем небольшие вариации для текстуры
-                            const variation = (Math.sin(x * 0.1 + t * Math.PI * 4) * 0.5 + 0.5) * 20 - 10;
+                            const variation = (Math.sin(x * 0.1 + stop.t * Math.PI * 4) * 0.5 + 0.5) * 20 - 10;
 
-                            const newR = Math.max(0, Math.min(255, baseR + variation));
-                            const newG = Math.max(0, Math.min(255, baseG + variation));
-                            const newB = Math.max(0, Math.min(255, baseB + variation));
+                            const newR = Math.max(0, Math.min(255, stop.baseR + variation));
+                            const newG = Math.max(0, Math.min(255, stop.baseG + variation));
+                            const newB = Math.max(0, Math.min(255, stop.baseB + variation));
 
-                            gradient.addColorStop(t, `rgb(${newR}, ${newG}, ${newB})`);
+                            gradient.addColorStop(stop.t, `rgb(${newR}, ${newG}, ${newB})`);
                         }
 
                         ctx.fillStyle = gradient;
@@ -2685,6 +2736,7 @@
         function resize() {
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
+            backgroundCacheValid = false; // Инвалидируем кеш фона при изменении размера
         }
 
         // Основной цикл анимации
@@ -3478,6 +3530,7 @@
             backgroundColor = e.target.value;
             backgroundType = 'color';
             backgroundImage = null;
+            backgroundCacheValid = false; // Инвалидируем кеш фона
             document.getElementById('bgPreview').textContent = `Цвет: ${backgroundColor}`;
             status.textContent = `Фон: цвет ${backgroundColor}`;
         });
@@ -3496,6 +3549,7 @@
                 img.onload = () => {
                     backgroundImage = img;
                     backgroundType = 'image';
+                    backgroundCacheValid = false; // Инвалидируем кеш фона
                     document.getElementById('bgPreview').textContent = `Изображение: ${file.name}`;
                     status.textContent = `Фон: ${file.name}`;
                 };
@@ -3524,6 +3578,7 @@
             backgroundColor = '#ffffff';
             backgroundImage = null;
             backgroundType = 'color';
+            backgroundCacheValid = false; // Инвалидируем кеш фона
             document.getElementById('bgColorPicker').value = '#ffffff';
             document.getElementById('bgPreview').textContent = '';
             status.textContent = 'Фон очищен (белый)';

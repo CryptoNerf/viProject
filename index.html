@@ -2655,21 +2655,31 @@
         handsDetector.onResults(onResults);
         console.log('Обработчик onResults подключен');
 
-        // Инициализация MediaPipe FaceMesh для детекции открытого рта
-        const faceMesh = new FaceMesh({
-            locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-            }
-        });
+        // Инициализация MediaPipe FaceMesh для детекции открытого рта (отложенная, неблокирующая)
+        let faceMesh = null;
+        let faceMeshReady = false;
 
-        faceMesh.setOptions({
-            maxNumFaces: 1,
-            refineLandmarks: true,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        });
+        // Инициализируем FaceMesh асинхронно, чтобы не блокировать Hands
+        setTimeout(() => {
+            console.log('=== ИНИЦИАЛИЗАЦИЯ MEDIAPIPE FACEMESH (асинхронно) ===');
+            faceMesh = new FaceMesh({
+                locateFile: (file) => {
+                    console.log('📦 FaceMesh запрашивает:', file);
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+                }
+            });
 
-        faceMesh.onResults(onFaceResults);
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            faceMesh.onResults(onFaceResults);
+            faceMeshReady = true;
+            console.log('✅ FaceMesh инициализирован');
+        }, 1000); // Задержка 1 секунда, чтобы Hands загрузился первым
 
         // Обработка результатов FaceMesh
         function onFaceResults(results) {
@@ -3394,10 +3404,12 @@
 
                     await handsDetector.send({ image: video });
                     // FaceMesh опционально - не блокирует работу рук
-                    try {
-                        await faceMesh.send({ image: video });
-                    } catch (faceError) {
-                        // Игнорируем ошибки FaceMesh
+                    if (faceMeshReady && faceMesh) {
+                        try {
+                            await faceMesh.send({ image: video });
+                        } catch (faceError) {
+                            // Игнорируем ошибки FaceMesh
+                        }
                     }
                 } catch (error) {
                     console.error('❌ Ошибка детекции рук:', error);

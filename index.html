@@ -748,9 +748,9 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
     <script>
         // Отключение Service Worker если он был зарегистрирован ранее
@@ -2545,6 +2545,8 @@
             frameCount++;
             if (frameCount === 1) {
                 console.log('🎉 onResults вызван первый раз! MediaPipe работает!');
+                console.log('✅ WASM успешно инициализирован');
+                console.log('Загруженные файлы:', wasmFilesLoaded);
             }
             if (frameCount % 60 === 0) {
                 console.log('MediaPipe Hands работает. Обнаружено рук:', results.multiHandLandmarks ? results.multiHandLandmarks.length : 0);
@@ -2614,17 +2616,30 @@
             }
         }
 
-        // Логирование информации о браузере для отладки
-        console.log('Информация о браузере:');
-        console.log('  crossOriginIsolated:', window.crossOriginIsolated);
-        console.log('  SharedArrayBuffer:', typeof SharedArrayBuffer !== 'undefined');
-        console.log('  Браузер:', navigator.userAgent);
+        // Диагностика для отладки проблем с MediaPipe
+        console.log('=== ДИАГНОСТИКА БРАУЗЕРА ===');
+        console.log('Браузер:', navigator.userAgent);
+        console.log('crossOriginIsolated:', window.crossOriginIsolated);
+        console.log('SharedArrayBuffer:', typeof SharedArrayBuffer !== 'undefined');
+        console.log('WebAssembly:', typeof WebAssembly !== 'undefined');
+
+        // Отслеживание ошибок загрузки
+        let wasmFilesLoaded = [];
+        let wasmLoadErrors = [];
+
+        window.addEventListener('error', (event) => {
+            if (event.filename && event.filename.includes('mediapipe')) {
+                console.error('❌ Ошибка загрузки MediaPipe:', event.filename, event.message);
+                wasmLoadErrors.push(event.filename);
+            }
+        }, true);
 
         // Инициализация MediaPipe Hands
-        console.log('Инициализация MediaPipe Hands...');
+        console.log('=== ИНИЦИАЛИЗАЦИЯ MEDIAPIPE HANDS ===');
         const handsDetector = new Hands({
             locateFile: (file) => {
-                console.log('MediaPipe загружает:', file);
+                console.log('📦 MediaPipe запрашивает:', file);
+                wasmFilesLoaded.push(file);
                 return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
             }
         });
@@ -3366,7 +3381,15 @@
                     }
                     if (sendCount === 30 && frameCount === 0) {
                         console.warn('⚠️ Отправлено 30 кадров, но onResults ни разу не вызван!');
-                        console.warn('MediaPipe WASM не инициализировался. Проверьте консоль на ошибки.');
+                        console.warn('MediaPipe WASM не инициализировался.');
+                        console.warn('Загружено файлов:', wasmFilesLoaded);
+                        console.warn('Ошибки загрузки:', wasmLoadErrors.length > 0 ? wasmLoadErrors : 'нет');
+                        console.warn('crossOriginIsolated:', window.crossOriginIsolated);
+                    }
+                    if (sendCount === 100 && frameCount === 0) {
+                        console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: MediaPipe не работает после 100 кадров!');
+                        console.error('Это может быть проблема с CORS или COEP политикой.');
+                        console.error('Проверьте Network вкладку в DevTools для деталей.');
                     }
 
                     await handsDetector.send({ image: video });

@@ -703,6 +703,37 @@
                 </div>
             </div>
             <div class="color-section">
+                <div class="label-paint">Эффекты:</div>
+                <div style="margin-top: 5px; display: flex; flex-direction: column; gap: 3px;">
+                    <label style="display: flex; align-items: center; gap: 5px; font-size: 11px; cursor: pointer;">
+                        <input type="checkbox" id="embossEffect" style="cursor: pointer;">
+                        <span>Тиснение</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 5px; font-size: 11px; cursor: pointer;">
+                        <input type="checkbox" id="microStripesEffect" style="cursor: pointer;">
+                        <span>Микро-полоски</span>
+                    </label>
+                    <div id="microStripesSettings" style="display: none; margin-left: 20px; margin-top: 5px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px; gap: 8px; flex-direction: column;">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 10px; color: #555;">Цвет 1:</label>
+                            <input type="color" id="stripeColor1" value="#ff0000" style="width: 100%; height: 25px; border: 1px solid #ccc; cursor: pointer;">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 10px; color: #555;">Цвет 2:</label>
+                            <input type="color" id="stripeColor2" value="#0000ff" style="width: 100%; height: 25px; border: 1px solid #ccc; cursor: pointer;">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 10px; color: #555;">Ширина: <span id="stripeWidthValue">2</span>px</label>
+                            <input type="range" id="stripeWidth" min="1" max="10" value="2" style="width: 100%; cursor: pointer;">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 10px; color: #555;">Расстояние: <span id="stripeSpacingValue">3</span>px</label>
+                            <input type="range" id="stripeSpacing" min="2" max="15" value="3" style="width: 100%; cursor: pointer;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="color-section">
                 <div class="label-paint">Фон:</div>
                 <div style="display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;">
                     <input type="color" id="bgColorPicker" value="#ffffff" title="Цвет фона" style="width: 50px; height: 30px; border: 2px outset #fff; cursor: pointer;">
@@ -896,6 +927,12 @@
                 // Цвета для Paint редактора (раздельные)
                 this.fillColor = null; // Цвет заливки внутренности
                 this.edgeColor = null; // Цвет заливки контура (пиксельный эффект)
+                this.emboss = false; // Эффект тиснения (bevel & emboss)
+                this.microStripes = false; // Эффект микро-градиентных полосок
+                this.stripeColor1 = '#ff0000'; // Цвет 1 для градиента полосок
+                this.stripeColor2 = '#0000ff'; // Цвет 2 для градиента полосок
+                this.stripeWidth = 2; // Ширина полосок
+                this.stripeSpacing = 3; // Расстояние между полосками
 
                 // Стабилизация формы - счетчик кадров с двумя руками
                 this.twoHandsFrameCount = 0; // Сколько кадров подряд видим 2 руки
@@ -1237,6 +1274,9 @@
             merged.fillColor = blendColors(mol1.fillColor, mol2.fillColor, weight1, weight2);
             merged.edgeColor = blendColors(mol1.edgeColor, mol2.edgeColor, weight1, weight2);
 
+            // ЭФФЕКТЫ: Если хотя бы одна молекула имеет эффект - применяем к результату
+            merged.emboss = mol1.emboss || mol2.emboss;
+
             return merged;
         }
 
@@ -1497,7 +1537,242 @@
                 }
             }
 
-            // ТРЕТИЙ СЛОЙ: Подсветка молекулы при наведении в режиме редактора
+            // ТРЕТИЙ СЛОЙ: Эффект тиснения (Bevel & Emboss) - создание иллюзии рельефа
+            // Рисуем смещенные светлые и темные контуры для эффекта выпуклости/вогнутости
+
+            // Сначала собираем все контурные линии для молекул с тиснением
+            const embossContours = [];
+
+            for (let i = 0; i < rows - 1; i++) {
+                for (let j = 0; j < cols - 1; j++) {
+                    const x = j * gridResolution;
+                    const y = i * gridResolution;
+
+                    const tl = field[i][j] >= threshold ? 1 : 0;
+                    const tr = field[i][j + 1] >= threshold ? 1 : 0;
+                    const br = field[i + 1][j + 1] >= threshold ? 1 : 0;
+                    const bl = field[i + 1][j] >= threshold ? 1 : 0;
+
+                    const cellIndex = tl * 8 + tr * 4 + br * 2 + bl * 1;
+
+                    if (cellIndex === 0 || cellIndex === 15) continue;
+
+                    // Проверяем что молекула имеет эффект тиснения
+                    const centerMol = dominantMolecule[i][j];
+                    if (!centerMol || !centerMol.emboss) continue;
+
+                    // Сохраняем информацию о контурных линиях
+                    embossContours.push({ x, y, i, j, cellIndex, mol: centerMol });
+                }
+            }
+
+            // Если есть контуры с тиснением - рисуем эффект
+            if (embossContours.length > 0) {
+                const size = gridResolution;
+                const embossDistance = 7; // УСИЛЕНО: Расстояние смещения для эффекта глубины (было 3)
+                const lightAngle = -135 * Math.PI / 180; // Угол света (сверху-слева)
+                const offsetX = Math.cos(lightAngle) * embossDistance;
+                const offsetY = Math.sin(lightAngle) * embossDistance;
+
+                // Функция для получения цвета фона
+                const getBgColor = () => {
+                    if (backgroundType === 'color') {
+                        return backgroundColor;
+                    }
+                    return '#f5f5f5'; // Дефолт
+                };
+
+                // Функция для осветления/затемнения цвета
+                const adjustColor = (color, amount) => {
+                    const r = parseInt(color.slice(1, 3), 16);
+                    const g = parseInt(color.slice(3, 5), 16);
+                    const b = parseInt(color.slice(5, 7), 16);
+
+                    const newR = Math.max(0, Math.min(255, r + amount));
+                    const newG = Math.max(0, Math.min(255, g + amount));
+                    const newB = Math.max(0, Math.min(255, b + amount));
+
+                    return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+                };
+
+                // Линии для marching squares
+                const lines = {
+                    1: [[3, 2]], 2: [[1, 2]], 3: [[3, 1]],
+                    4: [[0, 1]], 5: [[0, 3], [1, 2]], 6: [[0, 2]],
+                    7: [[0, 3]], 8: [[0, 3]], 9: [[0, 2]],
+                    10: [[0, 1], [3, 2]], 11: [[0, 1]], 12: [[3, 1]],
+                    13: [[1, 2]], 14: [[3, 2]]
+                };
+
+                function getEdgePoint(edge, i, j) {
+                    const tl = field[i][j];
+                    const tr = field[i][j + 1];
+                    const br = field[i + 1][j + 1];
+                    const bl = field[i + 1][j];
+                    let t = 0.5;
+
+                    switch(edge) {
+                        case 0: // Верх
+                            t = (threshold - tl) / (tr - tl);
+                            return { x: t * size, y: 0 };
+                        case 1: // Право
+                            t = (threshold - tr) / (br - tr);
+                            return { x: size, y: t * size };
+                        case 2: // Низ
+                            t = (threshold - bl) / (br - bl);
+                            return { x: t * size, y: size };
+                        case 3: // Лево
+                            t = (threshold - tl) / (bl - tl);
+                            return { x: 0, y: t * size };
+                    }
+                }
+
+                // Рисуем для каждого контура
+                for (const contour of embossContours) {
+                    const { x, y, i, j, cellIndex, mol } = contour;
+
+                    if (!lines[cellIndex]) continue;
+
+                    // Определяем базовый цвет (фон или заливка молекулы)
+                    const baseColor = mol.fillColor || getBgColor();
+
+                    // СВЕТЛЫЙ КОНТУР (смещен в сторону света)
+                    ctx.strokeStyle = adjustColor(baseColor, 130); // УСИЛЕНО: Светлее (было 80)
+                    ctx.lineWidth = 4.5; // УСИЛЕНО: Толще (было 2.5)
+                    ctx.shadowColor = 'rgba(255, 255, 255, 0.9)'; // УСИЛЕНО: Ярче тень (было 0.6)
+                    ctx.shadowBlur = 6; // УСИЛЕНО: Мягче тень (было 3)
+
+                    ctx.beginPath();
+                    for (const [e1, e2] of lines[cellIndex]) {
+                        const p1 = getEdgePoint(e1, i, j);
+                        const p2 = getEdgePoint(e2, i, j);
+                        ctx.moveTo(x + p1.x + offsetX, y + p1.y + offsetY);
+                        ctx.lineTo(x + p2.x + offsetX, y + p2.y + offsetY);
+                    }
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    // ТЕМНЫЙ КОНТУР (смещен противоположно свету)
+                    ctx.strokeStyle = adjustColor(baseColor, -130); // УСИЛЕНО: Темнее (было -80)
+                    ctx.lineWidth = 4.5; // УСИЛЕНО: Толще (было 2.5)
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)'; // УСИЛЕНО: Темнее тень (было 0.6)
+                    ctx.shadowBlur = 6; // УСИЛЕНО: Мягче тень (было 3)
+
+                    ctx.beginPath();
+                    for (const [e1, e2] of lines[cellIndex]) {
+                        const p1 = getEdgePoint(e1, i, j);
+                        const p2 = getEdgePoint(e2, i, j);
+                        ctx.moveTo(x + p1.x - offsetX, y + p1.y - offsetY);
+                        ctx.lineTo(x + p2.x - offsetX, y + p2.y - offsetY);
+                    }
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            // ЧЕТВЕРТЫЙ СЛОЙ: Микро-градиентные полоски для текстуры
+            // Заполняем всю площадь молекулы вертикальными градиентными полосками
+
+            // Собираем молекулы с микрополосками
+            const moleculesWithStripes = molecules.filter(mol => mol.microStripes);
+
+            if (moleculesWithStripes.length > 0) {
+                for (const mol of moleculesWithStripes) {
+                    // Используем настройки из объекта молекулы
+                    const stripeWidth = mol.stripeWidth || 2;
+                    const stripeSpacing = mol.stripeSpacing || 3;
+                    const color1 = mol.stripeColor1 || '#ff0000';
+                    const color2 = mol.stripeColor2 || '#0000ff';
+
+                    // Определяем bounding box молекулы
+                    let minX = Infinity, maxX = -Infinity;
+                    let minY = Infinity, maxY = -Infinity;
+
+                    // Находим границы молекулы по полю
+                    for (let i = 0; i < rows; i++) {
+                        for (let j = 0; j < cols; j++) {
+                            if (dominantMolecule[i][j] === mol && field[i][j] >= threshold) {
+                                const x = j * gridResolution;
+                                const y = i * gridResolution;
+                                minX = Math.min(minX, x);
+                                maxX = Math.max(maxX, x);
+                                minY = Math.min(minY, y);
+                                maxY = Math.max(maxY, y);
+                            }
+                        }
+                    }
+
+                    if (minX === Infinity) continue;
+
+                    // Парсим цвета
+                    const r1 = parseInt(color1.slice(1, 3), 16);
+                    const g1 = parseInt(color1.slice(3, 5), 16);
+                    const b1 = parseInt(color1.slice(5, 7), 16);
+
+                    const r2 = parseInt(color2.slice(1, 3), 16);
+                    const g2 = parseInt(color2.slice(3, 5), 16);
+                    const b2 = parseInt(color2.slice(5, 7), 16);
+
+                    // Создаем маску для молекулы
+                    ctx.save();
+                    ctx.beginPath();
+
+                    // Обводим контур молекулы для маски
+                    for (let i = 0; i < rows - 1; i++) {
+                        for (let j = 0; j < cols - 1; j++) {
+                            if (dominantMolecule[i][j] !== mol) continue;
+
+                            const x = j * gridResolution;
+                            const y = i * gridResolution;
+
+                            const tl = field[i][j] >= threshold ? 1 : 0;
+                            const tr = field[i][j + 1] >= threshold ? 1 : 0;
+                            const br = field[i + 1][j + 1] >= threshold ? 1 : 0;
+                            const bl = field[i + 1][j] >= threshold ? 1 : 0;
+
+                            // Простая заливка области молекулы
+                            if (tl || tr || br || bl) {
+                                ctx.rect(x, y, gridResolution, gridResolution);
+                            }
+                        }
+                    }
+
+                    ctx.clip(); // Ограничиваем рисование областью молекулы
+
+                    // Рисуем вертикальные полоски с градиентом
+                    for (let x = minX - stripeSpacing; x <= maxX + stripeSpacing; x += stripeSpacing) {
+                        // Создаем градиент для каждой полоски от color1 к color2
+                        const gradient = ctx.createLinearGradient(x, minY, x, maxY);
+
+                        // Генерируем плавный переход между двумя цветами с вариациями
+                        const numStops = 10;
+                        for (let i = 0; i <= numStops; i++) {
+                            const t = i / numStops;
+
+                            // Линейная интерполяция между color1 и color2
+                            const baseR = r1 + (r2 - r1) * t;
+                            const baseG = g1 + (g2 - g1) * t;
+                            const baseB = b1 + (b2 - b1) * t;
+
+                            // Добавляем небольшие вариации для текстуры
+                            const variation = (Math.sin(x * 0.1 + t * Math.PI * 4) * 0.5 + 0.5) * 20 - 10;
+
+                            const newR = Math.max(0, Math.min(255, baseR + variation));
+                            const newG = Math.max(0, Math.min(255, baseG + variation));
+                            const newB = Math.max(0, Math.min(255, baseB + variation));
+
+                            gradient.addColorStop(t, `rgb(${newR}, ${newG}, ${newB})`);
+                        }
+
+                        ctx.fillStyle = gradient;
+                        ctx.fillRect(x, minY, stripeWidth, maxY - minY);
+                    }
+
+                    ctx.restore();
+                }
+            }
+
+            // ПЯТЫЙ СЛОЙ: Подсветка молекулы при наведении в режиме редактора
             if (editorMode && hoveredMoleculeEditor && (currentTool === 'fill' || currentTool === 'eraser')) {
                 const mol = hoveredMoleculeEditor;
 
@@ -2397,8 +2672,8 @@
 
         // Основной цикл анимации
         function animate() {
-            // Очищаем canvas в начале каждого кадра
-            // Это предотвращает наложение старых кадров (баг с прозрачным PNG)
+            // Полная очистка canvas в начале каждого кадра
+            // Это предотвращает следы от движущихся объектов
             ctx.clearRect(0, 0, width, height);
 
             // Если включено "показать видео" - рисуем видео с камеры как фон
@@ -3114,7 +3389,8 @@
                     stretchY: mol.stretchY,
                     deformAngle: mol.deformAngle,
                     fillColor: mol.fillColor || null, // Сохраняем цвет заливки внутренности
-                    edgeColor: mol.edgeColor || null  // Сохраняем цвет заливки контура
+                    edgeColor: mol.edgeColor || null, // Сохраняем цвет заливки контура
+                    emboss: mol.emboss || false       // Сохраняем эффект тиснения
                 }));
 
                 status.textContent = `Режим редактора | Молекул: ${molecules.length}`;
@@ -3130,11 +3406,12 @@
 
                 selectedMolecule = null;
 
-                // Применяем изменённые цвета обратно к молекулам
+                // Применяем изменённые цвета и эффекты обратно к молекулам
                 frozenMolecules.forEach((frozen, i) => {
                     if (molecules[i]) {
                         molecules[i].fillColor = frozen.fillColor;
                         molecules[i].edgeColor = frozen.edgeColor;
+                        molecules[i].emboss = frozen.emboss;
                     }
                 });
 
@@ -3225,6 +3502,22 @@
             status.textContent = 'Фон очищен (белый)';
         });
 
+        // Показ/скрытие настроек микрополосок
+        document.getElementById('microStripesEffect').addEventListener('change', (e) => {
+            const settings = document.getElementById('microStripesSettings');
+            settings.style.display = e.target.checked ? 'flex' : 'none';
+        });
+
+        // Обновление значения ширины полосок
+        document.getElementById('stripeWidth').addEventListener('input', (e) => {
+            document.getElementById('stripeWidthValue').textContent = e.target.value;
+        });
+
+        // Обновление значения расстояния между полосками
+        document.getElementById('stripeSpacing').addEventListener('input', (e) => {
+            document.getElementById('stripeSpacingValue').textContent = e.target.value;
+        });
+
         // Движение мыши в режиме редактора - для подсветки
         canvas.addEventListener('mousemove', (e) => {
             if (!editorMode) return;
@@ -3284,6 +3577,20 @@
                     clickedMolecule.edgeColor = primaryColor;
                 }
 
+                // Применяем эффекты если включены
+                const embossCheckbox = document.getElementById('embossEffect');
+                const microStripesCheckbox = document.getElementById('microStripesEffect');
+                clickedMolecule.emboss = embossCheckbox.checked;
+                clickedMolecule.microStripes = microStripesCheckbox.checked;
+
+                // Сохраняем настройки микрополосок если эффект включен
+                if (clickedMolecule.microStripes) {
+                    clickedMolecule.stripeColor1 = document.getElementById('stripeColor1').value;
+                    clickedMolecule.stripeColor2 = document.getElementById('stripeColor2').value;
+                    clickedMolecule.stripeWidth = parseInt(document.getElementById('stripeWidth').value);
+                    clickedMolecule.stripeSpacing = parseInt(document.getElementById('stripeSpacing').value);
+                }
+
                 // Обновляем замороженное состояние
                 const molIndex = molecules.indexOf(clickedMolecule);
                 if (frozenMolecules[molIndex]) {
@@ -3293,11 +3600,21 @@
                     if (fillMode === 'edge' || fillMode === 'both') {
                         frozenMolecules[molIndex].edgeColor = primaryColor;
                     }
+                    frozenMolecules[molIndex].emboss = clickedMolecule.emboss;
+                    frozenMolecules[molIndex].microStripes = clickedMolecule.microStripes;
+                    frozenMolecules[molIndex].stripeColor1 = clickedMolecule.stripeColor1;
+                    frozenMolecules[molIndex].stripeColor2 = clickedMolecule.stripeColor2;
+                    frozenMolecules[molIndex].stripeWidth = clickedMolecule.stripeWidth;
+                    frozenMolecules[molIndex].stripeSpacing = clickedMolecule.stripeSpacing;
                 }
 
                 const modeText = fillMode === 'interior' ? 'внутренность' :
                                  fillMode === 'edge' ? 'контур' : 'внутренность+контур';
-                status.textContent = `Залито ${modeText} цветом ${primaryColor}`;
+                const effectsText = [];
+                if (clickedMolecule.emboss) effectsText.push('тиснение');
+                if (clickedMolecule.microStripes) effectsText.push('полоски');
+                const effectsSuffix = effectsText.length > 0 ? ' + ' + effectsText.join(' + ') : '';
+                status.textContent = `Залито ${modeText} цветом ${primaryColor}${effectsSuffix}`;
             } else if (currentTool === 'eraser' && clickedMolecule) {
                 // Ластик удаляет заливку в зависимости от режима
                 if (fillMode === 'interior' || fillMode === 'both') {
@@ -3306,6 +3623,8 @@
                 if (fillMode === 'edge' || fillMode === 'both') {
                     clickedMolecule.edgeColor = null;
                 }
+                clickedMolecule.emboss = false; // Убираем тиснение
+                clickedMolecule.microStripes = false; // Убираем полоски
 
                 // Обновляем замороженное состояние
                 const molIndex = molecules.indexOf(clickedMolecule);
@@ -3316,6 +3635,8 @@
                     if (fillMode === 'edge' || fillMode === 'both') {
                         frozenMolecules[molIndex].edgeColor = null;
                     }
+                    frozenMolecules[molIndex].emboss = false;
+                    frozenMolecules[molIndex].microStripes = false;
                 }
 
                 const modeText = fillMode === 'interior' ? 'внутренность' :

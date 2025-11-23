@@ -2639,8 +2639,9 @@
                                     window.location.hostname === '127.0.0.1' ||
                                     window.location.hostname === '';
 
-        const mediapipeBasePath = isLocalDevelopment ? './public/mediapipe' : '/mediapipe';
-        console.log('Окружение:', isLocalDevelopment ? 'Live Server' : 'Production');
+        // Теперь index.html в public/, поэтому пути одинаковые для обоих окружений
+        const mediapipeBasePath = './mediapipe';
+        console.log('Окружение:', isLocalDevelopment ? 'Live Server' : 'Production (Vercel)');
         console.log('MediaPipe базовый путь:', mediapipeBasePath);
 
         // Инициализация MediaPipe Hands

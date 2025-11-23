@@ -11,8 +11,9 @@ MediaPipe файлы теперь хостятся локально на Vercel 
 ## Структура файлов
 
 ```
-public/
-└── mediapipe/
+public/                           # Vercel использует эту папку как корень сайта
+├── index.html                    # Главная страница
+└── mediapipe/                    # MediaPipe файлы
     ├── hands/
     │   ├── hands_solution_simd_wasm_bin.wasm (6 MB)
     │   ├── hands_solution_simd_wasm_bin.js
@@ -65,14 +66,14 @@ git push
 
 ## Что изменилось в коде
 
-В `index.html` изменены пути `locateFile`:
+В `public/index.html` изменены пути `locateFile`:
 
 ```javascript
 // БЫЛО:
 return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
 
 // СТАЛО:
-return `/mediapipe/hands/${file}`;
+return `./mediapipe/hands/${file}`;
 ```
 
-Теперь MediaPipe загружает файлы с вашего Vercel домена вместо CDN.
+Теперь MediaPipe загружает файлы локально с относительными путями. Работает одинаково на Live Server и Vercel!

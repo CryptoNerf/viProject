@@ -748,9 +748,9 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <script src="https://unpkg.com/@mediapipe/camera_utils@0.3.1675469240/camera_utils.js"></script>
+    <script src="https://unpkg.com/@mediapipe/hands@0.4.1675469240/hands.js"></script>
+    <script src="https://unpkg.com/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js"></script>
 
     <script>
         // Основные переменные
@@ -2504,7 +2504,8 @@
         // Инициализация MediaPipe Hands
         const handsDetector = new Hands({
             locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                // Используем unpkg.com для большей стабильности в production
+                return `https://unpkg.com/@mediapipe/hands@0.4.1675469240/${file}`;
             }
         });
 
@@ -2520,7 +2521,8 @@
         // Инициализация MediaPipe FaceMesh для детекции открытого рта
         const faceMesh = new FaceMesh({
             locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+                // Используем unpkg.com для большей стабильности в production
+                return `https://unpkg.com/@mediapipe/face_mesh@0.4.1633559619/${file}`;
             }
         });
 

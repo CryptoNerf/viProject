@@ -748,12 +748,21 @@
         </div>
     </div>
 
-    <!-- MediaPipe библиотеки через CDN -->
-    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js"></script>
-    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
-    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
 
     <script>
+        // Отключение Service Worker если он был зарегистрирован ранее
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (let registration of registrations) {
+                    registration.unregister();
+                    console.log('Service Worker удален');
+                }
+            });
+        }
+
         // Основные переменные
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -2434,6 +2443,9 @@
 
             // Логируем каждые 60 кадров
             frameCount++;
+            if (frameCount === 1) {
+                console.log('🎉 onResults вызван первый раз! MediaPipe работает!');
+            }
             if (frameCount % 60 === 0) {
                 console.log('MediaPipe Hands работает. Обнаружено рук:', results.multiHandLandmarks ? results.multiHandLandmarks.length : 0);
             }
@@ -2503,43 +2515,29 @@
         }
 
         // Инициализация MediaPipe Hands
-        let handsDetector;
-        try {
-            console.log('Создание экземпляра MediaPipe Hands...');
-            handsDetector = new Hands({
-                locateFile: (file) => {
-                    console.log('MediaPipe Hands загружает файл:', file);
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
-                }
-            });
+        console.log('Инициализация MediaPipe Hands...');
+        const handsDetector = new Hands({
+            locateFile: (file) => {
+                console.log('MediaPipe загружает:', file);
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }
+        });
 
-            console.log('Конфигурация MediaPipe Hands...');
-            handsDetector.setOptions({
-                maxNumHands: 2,
-                modelComplexity: 1,
-                minDetectionConfidence: 0.7,
-                minTrackingConfidence: 0.7
-            });
+        handsDetector.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
+        });
+        console.log('MediaPipe Hands настроен');
 
-            console.log('Подключение обработчика результатов...');
-            handsDetector.onResults(onResults);
-
-            // Явная инициализация
-            console.log('Инициализация MediaPipe Hands...');
-            handsDetector.initialize().then(() => {
-                console.log('✅ MediaPipe Hands успешно инициализирован');
-            }).catch(err => {
-                console.error('❌ Ошибка инициализации MediaPipe Hands:', err);
-            });
-        } catch (error) {
-            console.error('❌ Критическая ошибка при создании MediaPipe Hands:', error);
-        }
+        handsDetector.onResults(onResults);
+        console.log('Обработчик onResults подключен');
 
         // Инициализация MediaPipe FaceMesh для детекции открытого рта
         const faceMesh = new FaceMesh({
             locateFile: (file) => {
-                console.log('MediaPipe FaceMesh загружает файл:', file);
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`;
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
             }
         });
 
@@ -3247,21 +3245,23 @@
 
         // Обработка видео для MediaPipe
         let detectHandsStarted = false;
+        let sendCount = 0;
         async function detectHands() {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
                 if (!detectHandsStarted) {
                     console.log('✅ Видео готово, начинаем детекцию рук');
-                    console.log('handsDetector готов:', !!handsDetector);
                     detectHandsStarted = true;
                 }
-
-                if (!handsDetector) {
-                    console.warn('⚠️ handsDetector не инициализирован, пропускаем кадр');
-                    requestAnimationFrame(detectHands);
-                    return;
-                }
-
                 try {
+                    sendCount++;
+                    if (sendCount === 1) {
+                        console.log('Отправляем первый кадр в MediaPipe...');
+                    }
+                    if (sendCount === 30 && frameCount === 0) {
+                        console.warn('⚠️ Отправлено 30 кадров, но onResults ни разу не вызван!');
+                        console.warn('MediaPipe WASM не инициализировался. Проверьте консоль на ошибки.');
+                    }
+
                     await handsDetector.send({ image: video });
                     // FaceMesh опционально - не блокирует работу рук
                     try {
@@ -3271,19 +3271,6 @@
                     }
                 } catch (error) {
                     console.error('❌ Ошибка детекции рук:', error);
-                    console.error('Детали ошибки:', {
-                        message: error.message,
-                        stack: error.stack,
-                        name: error.name
-                    });
-                    // Пытаемся переинициализировать через 5 секунд
-                    if (!window.handDetectorReinitialized) {
-                        window.handDetectorReinitialized = true;
-                        console.log('Попытка переинициализации MediaPipe через 5 секунд...');
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 5000);
-                    }
                 }
             }
             requestAnimationFrame(detectHands);

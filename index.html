@@ -748,9 +748,10 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/@mediapipe/camera_utils@0.3.1675469240/camera_utils.js"></script>
-    <script src="https://unpkg.com/@mediapipe/hands@0.4.1675469240/hands.js"></script>
-    <script src="https://unpkg.com/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js"></script>
+    <!-- MediaPipe библиотеки через CDN -->
+    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js"></script>
+    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
+    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js"></script>
 
     <script>
         // Основные переменные
@@ -2502,27 +2503,43 @@
         }
 
         // Инициализация MediaPipe Hands
-        const handsDetector = new Hands({
-            locateFile: (file) => {
-                // Используем unpkg.com для большей стабильности в production
-                return `https://unpkg.com/@mediapipe/hands@0.4.1675469240/${file}`;
-            }
-        });
+        let handsDetector;
+        try {
+            console.log('Создание экземпляра MediaPipe Hands...');
+            handsDetector = new Hands({
+                locateFile: (file) => {
+                    console.log('MediaPipe Hands загружает файл:', file);
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
+                }
+            });
 
-        handsDetector.setOptions({
-            maxNumHands: 2,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.7
-        });
+            console.log('Конфигурация MediaPipe Hands...');
+            handsDetector.setOptions({
+                maxNumHands: 2,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.7
+            });
 
-        handsDetector.onResults(onResults);
+            console.log('Подключение обработчика результатов...');
+            handsDetector.onResults(onResults);
+
+            // Явная инициализация
+            console.log('Инициализация MediaPipe Hands...');
+            handsDetector.initialize().then(() => {
+                console.log('✅ MediaPipe Hands успешно инициализирован');
+            }).catch(err => {
+                console.error('❌ Ошибка инициализации MediaPipe Hands:', err);
+            });
+        } catch (error) {
+            console.error('❌ Критическая ошибка при создании MediaPipe Hands:', error);
+        }
 
         // Инициализация MediaPipe FaceMesh для детекции открытого рта
         const faceMesh = new FaceMesh({
             locateFile: (file) => {
-                // Используем unpkg.com для большей стабильности в production
-                return `https://unpkg.com/@mediapipe/face_mesh@0.4.1633559619/${file}`;
+                console.log('MediaPipe FaceMesh загружает файл:', file);
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`;
             }
         });
 
@@ -3234,8 +3251,16 @@
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
                 if (!detectHandsStarted) {
                     console.log('✅ Видео готово, начинаем детекцию рук');
+                    console.log('handsDetector готов:', !!handsDetector);
                     detectHandsStarted = true;
                 }
+
+                if (!handsDetector) {
+                    console.warn('⚠️ handsDetector не инициализирован, пропускаем кадр');
+                    requestAnimationFrame(detectHands);
+                    return;
+                }
+
                 try {
                     await handsDetector.send({ image: video });
                     // FaceMesh опционально - не блокирует работу рук
@@ -3246,6 +3271,19 @@
                     }
                 } catch (error) {
                     console.error('❌ Ошибка детекции рук:', error);
+                    console.error('Детали ошибки:', {
+                        message: error.message,
+                        stack: error.stack,
+                        name: error.name
+                    });
+                    // Пытаемся переинициализировать через 5 секунд
+                    if (!window.handDetectorReinitialized) {
+                        window.handDetectorReinitialized = true;
+                        console.log('Попытка переинициализации MediaPipe через 5 секунд...');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 5000);
+                    }
                 }
             }
             requestAnimationFrame(detectHands);

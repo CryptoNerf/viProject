@@ -2634,13 +2634,25 @@
             }
         }, true);
 
+        // Определяем окружение для правильных путей к MediaPipe
+        const isLocalDevelopment = window.location.hostname === 'localhost' ||
+                                    window.location.hostname === '127.0.0.1' ||
+                                    window.location.hostname === '';
+
+        const mediapipeBasePath = isLocalDevelopment ? './public/mediapipe' : '/mediapipe';
+        console.log('Окружение:', isLocalDevelopment ? 'Live Server' : 'Production');
+        console.log('MediaPipe базовый путь:', mediapipeBasePath);
+
         // Инициализация MediaPipe Hands
         console.log('=== ИНИЦИАЛИЗАЦИЯ MEDIAPIPE HANDS ===');
         const handsDetector = new Hands({
             locateFile: (file) => {
                 console.log('📦 MediaPipe запрашивает:', file);
                 wasmFilesLoaded.push(file);
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                // Используем локальные файлы вместо CDN для быстрой загрузки
+                const path = `${mediapipeBasePath}/hands/${file}`;
+                console.log('  → Путь:', path);
+                return path;
             }
         });
 
@@ -2665,7 +2677,10 @@
             faceMesh = new FaceMesh({
                 locateFile: (file) => {
                     console.log('📦 FaceMesh запрашивает:', file);
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+                    // Используем локальные файлы вместо CDN для быстрой загрузки
+                    const path = `${mediapipeBasePath}/face_mesh/${file}`;
+                    console.log('  → Путь:', path);
+                    return path;
                 }
             });
 

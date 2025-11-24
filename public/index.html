@@ -734,6 +734,16 @@
                 </div>
             </div>
             <div class="color-section">
+                <div class="label-paint">Карандаш:</div>
+                <div style="margin-top: 5px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label style="font-size: 11px;">Толщина: <span id="pencilWidthValue">3</span>px</label>
+                        <input type="range" id="pencilWidth" min="1" max="20" value="3" style="width: 100%; cursor: pointer;">
+                    </div>
+                    <button id="clearDrawings" style="padding: 6px 12px; cursor: pointer; font-size: 11px; background: #ff4444; color: white; border: 1px solid #cc0000; border-radius: 3px;">Очистить весь карандаш</button>
+                </div>
+            </div>
+            <div class="color-section">
                 <div class="label-paint">Фон:</div>
                 <div style="display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;">
                     <input type="color" id="bgColorPicker" value="#ffffff" title="Цвет фона" style="width: 50px; height: 30px; border: 2px outset #fff; cursor: pointer;">
@@ -791,6 +801,13 @@
         let primaryColor = '#000000'; // Основной цвет
         let secondaryColor = '#ffffff'; // Фоновый цвет
         let fillMode = 'both'; // Режим заливки: 'interior' (внутренность), 'edge' (контур), 'both' (оба)
+
+        // Настройки карандаша
+        let pencilWidth = 3; // Толщина карандаша в пикселях
+        let drawnStrokes = []; // Массив нарисованных штрихов { points: [{x, y}], color: string, width: number }
+        let currentStroke = null; // Текущий рисуемый штрих
+        let isDrawing = false; // Флаг рисования
+        let filledRegions = []; // Массив залитых областей { imageData: ImageData, x: number, y: number, width: number, height: number }
 
         // Фон
         let backgroundColor = '#ffffff'; // Цвет фона
@@ -1913,6 +1930,44 @@
                     const metrics = ctx.measureText(hint);
                     ctx.fillText(hint, mol.x - metrics.width / 2, mol.y - mol.size - 10);
                 }
+            }
+
+            // ШЕСТОЙ СЛОЙ: Отрисовка штрихов карандаша
+            // Сначала рисуем залитые области (под штрихами)
+            for (const region of filledRegions) {
+                ctx.putImageData(region.imageData, region.x, region.y);
+            }
+
+            // Затем рисуем все завершенные штрихи
+            for (const stroke of drawnStrokes) {
+                if (stroke.points.length < 2) continue;
+
+                ctx.strokeStyle = stroke.color;
+                ctx.lineWidth = stroke.width;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                ctx.beginPath();
+                ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                for (let i = 1; i < stroke.points.length; i++) {
+                    ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+                }
+                ctx.stroke();
+            }
+
+            // Рисуем текущий рисуемый штрих
+            if (currentStroke && currentStroke.points.length > 1) {
+                ctx.strokeStyle = currentStroke.color;
+                ctx.lineWidth = currentStroke.width;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                ctx.beginPath();
+                ctx.moveTo(currentStroke.points[0].x, currentStroke.points[0].y);
+                for (let i = 1; i < currentStroke.points.length; i++) {
+                    ctx.lineTo(currentStroke.points[i].x, currentStroke.points[i].y);
+                }
+                ctx.stroke();
             }
         }
 
@@ -3701,6 +3756,25 @@
             document.getElementById('stripeWidthValue').textContent = e.target.value;
         });
 
+        // Обновление толщины карандаша
+        document.getElementById('pencilWidth').addEventListener('input', (e) => {
+            pencilWidth = parseInt(e.target.value);
+            document.getElementById('pencilWidthValue').textContent = e.target.value;
+        });
+
+        // Очистка всех рисунков карандашом
+        document.getElementById('clearDrawings').addEventListener('click', () => {
+            if (drawnStrokes.length > 0 || filledRegions.length > 0) {
+                if (confirm('Удалить все нарисованные штрихи и залитые области?')) {
+                    drawnStrokes = [];
+                    filledRegions = [];
+                    status.textContent = 'Все рисунки удалены';
+                }
+            } else {
+                status.textContent = 'Нет рисунков для удаления';
+            }
+        });
+
         // Обновление значения расстояния между полосками
         document.getElementById('stripeSpacing').addEventListener('input', (e) => {
             document.getElementById('stripeSpacingValue').textContent = e.target.value;
@@ -3803,6 +3877,17 @@
                 if (clickedMolecule.microStripes) effectsText.push('полоски');
                 const effectsSuffix = effectsText.length > 0 ? ' + ' + effectsText.join(' + ') : '';
                 status.textContent = `Залито ${modeText} цветом ${primaryColor}${effectsSuffix}`;
+            } else if (currentTool === 'fill' && !clickedMolecule) {
+                // Заливка областей, нарисованных карандашом (flood fill)
+                const fillResult = floodFillStrokes(clickX, clickY, primaryColor);
+                if (fillResult === 'too_large') {
+                    status.textContent = '⚠️ Область слишком большая! Нарисуйте замкнутую фигуру карандашом';
+                } else if (fillResult) {
+                    filledRegions.push(fillResult);
+                    status.textContent = `Залито ${fillResult.width * fillResult.height} пикселей цветом ${primaryColor}`;
+                } else {
+                    status.textContent = 'Нечего заливать (кликните внутри замкнутой области)';
+                }
             } else if (currentTool === 'eraser' && clickedMolecule) {
                 // Ластик удаляет заливку в зависимости от режима
                 if (fillMode === 'interior' || fillMode === 'both') {
@@ -3831,6 +3916,316 @@
                                  fillMode === 'edge' ? 'контур' : 'внутренность+контур';
                 status.textContent = `Стёрто ${modeText}`;
             }
+        });
+
+        // Функция проверки пересечения точки с линией (для ластика)
+        function distanceToLineSegment(px, py, x1, y1, x2, y2) {
+            const A = px - x1;
+            const B = py - y1;
+            const C = x2 - x1;
+            const D = y2 - y1;
+
+            const dot = A * C + B * D;
+            const lenSq = C * C + D * D;
+            let param = -1;
+
+            if (lenSq != 0) param = dot / lenSq;
+
+            let xx, yy;
+
+            if (param < 0) {
+                xx = x1;
+                yy = y1;
+            } else if (param > 1) {
+                xx = x2;
+                yy = y2;
+            } else {
+                xx = x1 + param * C;
+                yy = y1 + param * D;
+            }
+
+            const dx = px - xx;
+            const dy = py - yy;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // Функция заливки области (flood fill) - работает на отдельном слое
+        function floodFillStrokes(startX, startY, fillColor) {
+            // Создаём временный canvas для рисования только штрихов
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Рисуем все штрихи на временном canvas
+            for (const stroke of drawnStrokes) {
+                if (stroke.points.length < 2) continue;
+                tempCtx.strokeStyle = stroke.color;
+                tempCtx.lineWidth = stroke.width;
+                tempCtx.lineCap = 'round';
+                tempCtx.lineJoin = 'round';
+                tempCtx.beginPath();
+                tempCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                for (let i = 1; i < stroke.points.length; i++) {
+                    tempCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
+                }
+                tempCtx.stroke();
+            }
+
+            // Получаем imageData
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const pixels = imageData.data;
+            const width = tempCanvas.width;
+            const height = tempCanvas.height;
+
+            startX = Math.floor(startX);
+            startY = Math.floor(startY);
+
+            if (startX < 0 || startX >= width || startY < 0 || startY >= height) {
+                return null;
+            }
+
+            const startIndex = (startY * width + startX) * 4;
+            const startR = pixels[startIndex];
+            const startG = pixels[startIndex + 1];
+            const startB = pixels[startIndex + 2];
+            const startA = pixels[startIndex + 3];
+
+            // Преобразуем цвет заливки в RGB
+            const colorCanvas = document.createElement('canvas');
+            colorCanvas.width = 1;
+            colorCanvas.height = 1;
+            const colorCtx = colorCanvas.getContext('2d');
+            colorCtx.fillStyle = fillColor;
+            colorCtx.fillRect(0, 0, 1, 1);
+            const colorData = colorCtx.getImageData(0, 0, 1, 1).data;
+            const fillR = colorData[0];
+            const fillG = colorData[1];
+            const fillB = colorData[2];
+            const fillA = 255;
+
+            // Если кликнули на штрих (непрозрачный пиксель), не заливаем
+            if (startA !== 0) {
+                return null;
+            }
+
+            const stack = [[startX, startY]];
+            const visited = new Set();
+            let minX = startX, maxX = startX, minY = startY, maxY = startY;
+
+            function matchesStart(index) {
+                return pixels[index] === startR &&
+                       pixels[index + 1] === startG &&
+                       pixels[index + 2] === startB &&
+                       pixels[index + 3] === startA;
+            }
+
+            const MAX_FILL_AREA = 50000; // Максимум 50000 пикселей
+
+            while (stack.length > 0) {
+                const [x, y] = stack.pop();
+                const key = `${x},${y}`;
+
+                if (visited.has(key)) continue;
+                if (x < 0 || x >= width || y < 0 || y >= height) continue;
+
+                const index = (y * width + x) * 4;
+
+                if (!matchesStart(index)) continue;
+
+                visited.add(key);
+
+                // Проверяем размер области - если слишком большая, отменяем заливку
+                if (visited.size > MAX_FILL_AREA) {
+                    return 'too_large';
+                }
+
+                // Заливаем пиксель
+                pixels[index] = fillR;
+                pixels[index + 1] = fillG;
+                pixels[index + 2] = fillB;
+                pixels[index + 3] = fillA;
+
+                // Обновляем границы
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x);
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y);
+
+                // Добавляем соседей
+                stack.push([x + 1, y]);
+                stack.push([x - 1, y]);
+                stack.push([x, y + 1]);
+                stack.push([x, y - 1]);
+            }
+
+            if (visited.size === 0) return null;
+
+            // Создаём обрезанный imageData только для залитой области
+            const fillWidth = maxX - minX + 1;
+            const fillHeight = maxY - minY + 1;
+            const fillImageData = tempCtx.createImageData(fillWidth, fillHeight);
+
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    const srcIndex = (y * width + x) * 4;
+                    const dstIndex = ((y - minY) * fillWidth + (x - minX)) * 4;
+                    fillImageData.data[dstIndex] = pixels[srcIndex];
+                    fillImageData.data[dstIndex + 1] = pixels[srcIndex + 1];
+                    fillImageData.data[dstIndex + 2] = pixels[srcIndex + 2];
+                    fillImageData.data[dstIndex + 3] = pixels[srcIndex + 3];
+                }
+            }
+
+            return {
+                imageData: fillImageData,
+                x: minX,
+                y: minY,
+                width: fillWidth,
+                height: fillHeight
+            };
+        }
+
+        // Обработчики мыши для карандаша и ластика
+        canvas.addEventListener('mousedown', (e) => {
+            if (!editorMode) return;
+            if (currentTool !== 'pencil' && currentTool !== 'eraser') return;
+
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            if (currentTool === 'pencil') {
+                // Начинаем новый штрих
+                currentStroke = {
+                    points: [{x, y}],
+                    color: primaryColor,
+                    width: pencilWidth
+                };
+            } else if (currentTool === 'eraser') {
+                // Стираем штрихи под ластиком
+                const eraserSize = pencilWidth * 2; // Ластик в 2 раза больше карандаша
+                drawnStrokes = drawnStrokes.filter(stroke => {
+                    // Проверяем каждую точку штриха
+                    for (const point of stroke.points) {
+                        const dist = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
+                        if (dist < eraserSize) {
+                            return false; // Удаляем этот штрих
+                        }
+                    }
+                    return true;
+                });
+
+                // Также стираем залитые области
+                for (const region of filledRegions) {
+                    if (x >= region.x && x < region.x + region.width &&
+                        y >= region.y && y < region.y + region.height) {
+                        // Стираем круг в imageData
+                        const pixels = region.imageData.data;
+                        for (let dy = -eraserSize; dy <= eraserSize; dy++) {
+                            for (let dx = -eraserSize; dx <= eraserSize; dx++) {
+                                const dist = Math.sqrt(dx * dx + dy * dy);
+                                if (dist <= eraserSize) {
+                                    const px = Math.floor(x - region.x + dx);
+                                    const py = Math.floor(y - region.y + dy);
+                                    if (px >= 0 && px < region.width && py >= 0 && py < region.height) {
+                                        const idx = (py * region.width + px) * 4;
+                                        pixels[idx + 3] = 0; // Делаем прозрачным
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!editorMode) return;
+            if (currentTool !== 'pencil' && currentTool !== 'eraser') return;
+            if (!isDrawing) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            if (currentTool === 'pencil') {
+                // Добавляем точку к текущему штриху
+                currentStroke.points.push({x, y});
+            } else if (currentTool === 'eraser') {
+                // Стираем штрихи под ластиком
+                const eraserSize = pencilWidth * 2;
+                drawnStrokes = drawnStrokes.filter(stroke => {
+                    for (let i = 0; i < stroke.points.length; i++) {
+                        const point = stroke.points[i];
+                        const dist = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
+                        if (dist < eraserSize) {
+                            return false;
+                        }
+                        // Проверяем также пересечение с линией между точками
+                        if (i > 0) {
+                            const prevPoint = stroke.points[i - 1];
+                            const lineDist = distanceToLineSegment(x, y, prevPoint.x, prevPoint.y, point.x, point.y);
+                            if (lineDist < eraserSize) {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                });
+
+                // Также стираем залитые области
+                for (const region of filledRegions) {
+                    if (x >= region.x && x < region.x + region.width &&
+                        y >= region.y && y < region.y + region.height) {
+                        // Стираем круг в imageData
+                        const pixels = region.imageData.data;
+                        for (let dy = -eraserSize; dy <= eraserSize; dy++) {
+                            for (let dx = -eraserSize; dx <= eraserSize; dx++) {
+                                const dist = Math.sqrt(dx * dx + dy * dy);
+                                if (dist <= eraserSize) {
+                                    const px = Math.floor(x - region.x + dx);
+                                    const py = Math.floor(y - region.y + dy);
+                                    if (px >= 0 && px < region.width && py >= 0 && py < region.height) {
+                                        const idx = (py * region.width + px) * 4;
+                                        pixels[idx + 3] = 0; // Делаем прозрачным
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                status.textContent = `Штрихов: ${drawnStrokes.length}, Областей: ${filledRegions.length}`;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (!editorMode || currentTool !== 'pencil' || !isDrawing) return;
+
+            isDrawing = false;
+            // Сохраняем завершенный штрих
+            if (currentStroke && currentStroke.points.length > 1) {
+                drawnStrokes.push(currentStroke);
+                status.textContent = `Нарисовано ${drawnStrokes.length} штрихов`;
+            }
+            currentStroke = null;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            if (!editorMode || currentTool !== 'pencil' || !isDrawing) return;
+
+            isDrawing = false;
+            // Сохраняем штрих при выходе за пределы canvas
+            if (currentStroke && currentStroke.points.length > 1) {
+                drawnStrokes.push(currentStroke);
+            }
+            currentStroke = null;
         });
 
         // Инициализация

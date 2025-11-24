@@ -645,6 +645,7 @@
                 <label for="showVideo">Показать видео</label>
             </div>
 
+            <button id="lockBtn">Заблокировать все</button>
             <button id="unlockBtn">Разблокировать все</button>
             <button id="clearBtn">Очистить все</button>
             <button id="modeToggleBtn">🎨 Режим редактора</button>
@@ -682,16 +683,18 @@
                 <div id="colorGrid"></div>
             </div>
             <div class="color-section">
-                <div class="label-paint">Текущий:</div>
+                <div class="label-paint">Текущий цвет:</div>
                 <div id="currentColorDisplay">
                     <div>
                         <div class="color-box" id="primaryColor" style="background: #000000;"></div>
-                        <div class="color-label">Основной</div>
+                        <div class="color-label">Для молекул</div>
                     </div>
-                    <div>
-                        <div class="color-box" id="secondaryColor" style="background: #ffffff;"></div>
-                        <div class="color-label">Фоновый</div>
-                    </div>
+                </div>
+            </div>
+            <div class="color-section">
+                <div class="label-paint">Свой цвет молекулы:</div>
+                <div style="margin-top: 5px;">
+                    <input type="color" id="customPrimaryColor" value="#000000" style="width: 100%; height: 35px; border: 2px solid #999; cursor: pointer;" title="Выбрать свой цвет для заливки молекул">
                 </div>
             </div>
             <div class="color-section">
@@ -744,9 +747,9 @@
                 </div>
             </div>
             <div class="color-section">
-                <div class="label-paint">Фон:</div>
+                <div class="label-paint">Фон canvas:</div>
                 <div style="display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;">
-                    <input type="color" id="bgColorPicker" value="#ffffff" title="Цвет фона" style="width: 50px; height: 30px; border: 2px outset #fff; cursor: pointer;">
+                    <input type="color" id="bgColorPicker" value="#ffffff" title="Цвет фона canvas" style="width: 50px; height: 30px; border: 2px outset #fff; cursor: pointer;">
                     <label class="fill-mode-btn" style="padding: 4px 8px; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">
                         Файл
                         <input type="file" id="bgFilePicker" accept="image/*,video/*" style="display: none;">
@@ -1168,6 +1171,12 @@
                 const margin = Math.min(this.size * 1.5, 200);
                 this.targetX = Math.max(margin, Math.min(width - margin, this.targetX));
                 this.targetY = Math.max(margin, Math.min(height - margin, this.targetY));
+            }
+
+            // Заблокировать молекулу (для UI)
+            lock() {
+                this.isLocked = true;
+                this.isShapeLocked = true;
             }
 
             // Разблокировать молекулу (для UI)
@@ -2367,7 +2376,8 @@
 
                 // Палец считается закрытым если расстояние кончик-основание мало
                 // И кончик близко к центру ладони
-                if (tipToBase < 0.09 && tipToPalm < 0.15) {
+                // УЛУЧШЕНО: Увеличены пороги для лучшей детекции
+                if (tipToBase < 0.12 && tipToPalm < 0.18) {
                     closedCount++;
                 }
             });
@@ -2379,7 +2389,8 @@
                 (thumbTip.x - palmCenter.x) ** 2 +
                 (thumbTip.y - palmCenter.y) ** 2
             );
-            const thumbClosed = thumbToPalm < 0.13;
+            // УЛУЧШЕНО: Увеличен порог для большого пальца
+            const thumbClosed = thumbToPalm < 0.16;
 
             // УЛУЧШЕНО: Кулак = минимум 3 пальца согнуты И большой палец тоже согнут
             // Также проверяем что это не щипок (thumb и index не слишком близко)
@@ -2387,7 +2398,7 @@
                 (thumbTip.x - landmarks[8].x) ** 2 +
                 (thumbTip.y - landmarks[8].y) ** 2
             );
-            const notPinching = thumbIndexDist > 0.06; // Не щипок
+            const notPinching = thumbIndexDist > 0.05; // Не щипок (немного уменьшен порог)
 
             return closedCount >= 3 && thumbClosed && notPinching;
         }
@@ -3565,6 +3576,10 @@
             video.style.opacity = config.showVideo ? '0.3' : '0';
         });
 
+        document.getElementById('lockBtn').addEventListener('click', () => {
+            molecules.forEach(mol => mol.lock());
+        });
+
         document.getElementById('unlockBtn').addEventListener('click', () => {
             molecules.forEach(mol => mol.unlock());
         });
@@ -3626,24 +3641,23 @@
                 swatch.dataset.color = color;
 
                 swatch.addEventListener('click', (e) => {
-                    // Левая кнопка - основной цвет, правая - фоновый
-                    if (e.button === 0) {
-                        primaryColor = color;
-                        document.getElementById('primaryColor').style.background = color;
+                    primaryColor = color;
+                    document.getElementById('primaryColor').style.background = color;
 
-                        // Снимаем выделение со всех
-                        document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
-                        swatch.classList.add('selected');
-                    }
-                });
-
-                swatch.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    secondaryColor = color;
-                    document.getElementById('secondaryColor').style.background = color;
+                    // Снимаем выделение со всех
+                    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+                    swatch.classList.add('selected');
                 });
 
                 colorGrid.appendChild(swatch);
+            });
+
+            // Обработчик для выбора произвольного цвета молекулы
+            document.getElementById('customPrimaryColor').addEventListener('input', (e) => {
+                primaryColor = e.target.value;
+                document.getElementById('primaryColor').style.background = e.target.value;
+                // Снимаем выделение со всех цветов палитры
+                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
             });
         }
 

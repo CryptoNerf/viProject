@@ -695,9 +695,9 @@
                 </div>
             </div>
             <div class="color-section">
-                <div class="label-paint">Режим заливки:</div>
+                <div class="label-paint" id="fillModeLabel">Режим заливки:</div>
                 <div style="display: flex; gap: 5px; margin-top: 5px;">
-                    <button class="fill-mode-btn active" data-mode="both" title="Заливка внутренности и контура">Оба</button>
+                    <button class="fill-mode-btn active" data-mode="both" title="Оба">Оба</button>
                     <button class="fill-mode-btn" data-mode="interior" title="Только внутренность">Внутри</button>
                     <button class="fill-mode-btn" data-mode="edge" title="Только контур">Контур</button>
                 </div>
@@ -734,7 +734,7 @@
                 </div>
             </div>
             <div class="color-section">
-                <div class="label-paint">Карандаш:</div>
+                <div class="label-paint" id="pencilToolLabel">Карандаш:</div>
                 <div style="margin-top: 5px; display: flex; flex-direction: column; gap: 8px;">
                     <div style="display: flex; flex-direction: column; gap: 4px;">
                         <label style="font-size: 11px;">Толщина: <span id="pencilWidthValue">3</span>px</label>
@@ -1541,7 +1541,52 @@
                 }
             }
 
-            if (molecules.length === 0) return;
+            if (molecules.length === 0) {
+                // Если нет молекул, рисуем только штрихи карандаша
+                // Сначала рисуем залитые области (под штрихами)
+                for (const region of filledRegions) {
+                    // Создаем временный canvas для правильного рендеринга с прозрачностью
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = region.width;
+                    tempCanvas.height = region.height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.putImageData(region.imageData, 0, 0);
+                    ctx.drawImage(tempCanvas, region.x, region.y);
+                }
+
+                // Затем рисуем все завершенные штрихи
+                for (const stroke of drawnStrokes) {
+                    if (stroke.points.length < 2) continue;
+
+                    ctx.strokeStyle = stroke.color;
+                    ctx.lineWidth = stroke.width;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+
+                    ctx.beginPath();
+                    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                    for (let i = 1; i < stroke.points.length; i++) {
+                        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+                    }
+                    ctx.stroke();
+                }
+
+                // Рисуем текущий рисуемый штрих
+                if (currentStroke && currentStroke.points.length > 1) {
+                    ctx.strokeStyle = currentStroke.color;
+                    ctx.lineWidth = currentStroke.width;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+
+                    ctx.beginPath();
+                    ctx.moveTo(currentStroke.points[0].x, currentStroke.points[0].y);
+                    for (let i = 1; i < currentStroke.points.length; i++) {
+                        ctx.lineTo(currentStroke.points[i].x, currentStroke.points[i].y);
+                    }
+                    ctx.stroke();
+                }
+                return;
+            }
 
             // Строим пространственный хеш для оптимизации
             const spatialHashStartTime = performance.now();
@@ -1932,10 +1977,16 @@
                 }
             }
 
-            // ШЕСТОЙ СЛОЙ: Отрисовка штрихов карандаша
+            // ШЕСТОЙ СЛОЙ: Отрисовка штрихов карандаша (поверх всех молекул)
             // Сначала рисуем залитые области (под штрихами)
             for (const region of filledRegions) {
-                ctx.putImageData(region.imageData, region.x, region.y);
+                // Создаем временный canvas для правильного рендеринга с прозрачностью
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = region.width;
+                tempCanvas.height = region.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.putImageData(region.imageData, 0, 0);
+                ctx.drawImage(tempCanvas, region.x, region.y);
             }
 
             // Затем рисуем все завершенные штрихи
@@ -3668,10 +3719,28 @@
                 document.querySelectorAll('.paint-tool').forEach(t => t.classList.remove('selected'));
                 tool.classList.add('selected');
                 currentTool = tool.dataset.tool;
+
+                // Меняем текст режима в зависимости от инструмента
+                const fillModeLabel = document.getElementById('fillModeLabel');
+                const pencilToolLabel = document.getElementById('pencilToolLabel');
+
+                if (currentTool === 'eraser') {
+                    fillModeLabel.textContent = 'Режим ластика:';
+                    pencilToolLabel.textContent = 'Ластик:';
+                } else if (currentTool === 'fill') {
+                    fillModeLabel.textContent = 'Режим заливки:';
+                    pencilToolLabel.textContent = 'Карандаш:';
+                } else if (currentTool === 'pencil') {
+                    fillModeLabel.textContent = 'Режим заливки:';
+                    pencilToolLabel.textContent = 'Карандаш:';
+                } else {
+                    fillModeLabel.textContent = 'Режим заливки:';
+                    pencilToolLabel.textContent = 'Карандаш:';
+                }
             });
         });
 
-        // Выбор режима заливки
+        // Выбор режима заливки/ластика
         document.querySelectorAll('.fill-mode-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 // Игнорируем кнопки без data-mode (например, кнопки фона)
@@ -3682,7 +3751,10 @@
                 });
                 btn.classList.add('active');
                 fillMode = btn.dataset.mode;
-                status.textContent = `Режим заливки: ${btn.textContent}`;
+
+                // Показываем разный текст в зависимости от инструмента
+                const modeLabel = currentTool === 'eraser' ? 'Режим ластика' : 'Режим заливки';
+                status.textContent = `${modeLabel}: ${btn.textContent}`;
             });
         });
 
@@ -3978,6 +4050,9 @@
             const width = tempCanvas.width;
             const height = tempCanvas.height;
 
+            // Сохраняем копию оригинального imageData для определения штрихов
+            const originalPixels = new Uint8ClampedArray(pixels);
+
             startX = Math.floor(startX);
             startY = Math.floor(startY);
 
@@ -4070,10 +4145,21 @@
                 for (let x = minX; x <= maxX; x++) {
                     const srcIndex = (y * width + x) * 4;
                     const dstIndex = ((y - minY) * fillWidth + (x - minX)) * 4;
-                    fillImageData.data[dstIndex] = pixels[srcIndex];
-                    fillImageData.data[dstIndex + 1] = pixels[srcIndex + 1];
-                    fillImageData.data[dstIndex + 2] = pixels[srcIndex + 2];
-                    fillImageData.data[dstIndex + 3] = pixels[srcIndex + 3];
+
+                    // Копируем только пиксели которые были прозрачными (НЕ штрихи)
+                    // Если в оригинале пиксель был непрозрачным (штрих), оставляем прозрачным
+                    if (originalPixels[srcIndex + 3] === 0) {
+                        fillImageData.data[dstIndex] = pixels[srcIndex];
+                        fillImageData.data[dstIndex + 1] = pixels[srcIndex + 1];
+                        fillImageData.data[dstIndex + 2] = pixels[srcIndex + 2];
+                        fillImageData.data[dstIndex + 3] = pixels[srcIndex + 3];
+                    } else {
+                        // Штрих - оставляем прозрачным
+                        fillImageData.data[dstIndex] = 0;
+                        fillImageData.data[dstIndex + 1] = 0;
+                        fillImageData.data[dstIndex + 2] = 0;
+                        fillImageData.data[dstIndex + 3] = 0;
+                    }
                 }
             }
 
@@ -4106,34 +4192,39 @@
                     width: pencilWidth
                 };
             } else if (currentTool === 'eraser') {
-                // Стираем штрихи под ластиком
                 const eraserSize = pencilWidth * 2; // Ластик в 2 раза больше карандаша
-                drawnStrokes = drawnStrokes.filter(stroke => {
-                    // Проверяем каждую точку штриха
-                    for (const point of stroke.points) {
-                        const dist = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
-                        if (dist < eraserSize) {
-                            return false; // Удаляем этот штрих
-                        }
-                    }
-                    return true;
-                });
 
-                // Также стираем залитые области
-                for (const region of filledRegions) {
-                    if (x >= region.x && x < region.x + region.width &&
-                        y >= region.y && y < region.y + region.height) {
-                        // Стираем круг в imageData
-                        const pixels = region.imageData.data;
-                        for (let dy = -eraserSize; dy <= eraserSize; dy++) {
-                            for (let dx = -eraserSize; dx <= eraserSize; dx++) {
-                                const dist = Math.sqrt(dx * dx + dy * dy);
-                                if (dist <= eraserSize) {
-                                    const px = Math.floor(x - region.x + dx);
-                                    const py = Math.floor(y - region.y + dy);
-                                    if (px >= 0 && px < region.width && py >= 0 && py < region.height) {
-                                        const idx = (py * region.width + px) * 4;
-                                        pixels[idx + 3] = 0; // Делаем прозрачным
+                // Стираем штрихи под ластиком (если режим edge или both)
+                if (fillMode === 'edge' || fillMode === 'both') {
+                    drawnStrokes = drawnStrokes.filter(stroke => {
+                        // Проверяем каждую точку штриха
+                        for (const point of stroke.points) {
+                            const dist = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
+                            if (dist < eraserSize) {
+                                return false; // Удаляем этот штрих
+                            }
+                        }
+                        return true;
+                    });
+                }
+
+                // Стираем залитые области (если режим interior или both)
+                if (fillMode === 'interior' || fillMode === 'both') {
+                    for (const region of filledRegions) {
+                        if (x >= region.x && x < region.x + region.width &&
+                            y >= region.y && y < region.y + region.height) {
+                            // Стираем круг в imageData
+                            const pixels = region.imageData.data;
+                            for (let dy = -eraserSize; dy <= eraserSize; dy++) {
+                                for (let dx = -eraserSize; dx <= eraserSize; dx++) {
+                                    const dist = Math.sqrt(dx * dx + dy * dy);
+                                    if (dist <= eraserSize) {
+                                        const px = Math.floor(x - region.x + dx);
+                                        const py = Math.floor(y - region.y + dy);
+                                        if (px >= 0 && px < region.width && py >= 0 && py < region.height) {
+                                            const idx = (py * region.width + px) * 4;
+                                            pixels[idx + 3] = 0; // Делаем прозрачным
+                                        }
                                     }
                                 }
                             }
@@ -4158,42 +4249,47 @@
                 // Добавляем точку к текущему штриху
                 currentStroke.points.push({x, y});
             } else if (currentTool === 'eraser') {
-                // Стираем штрихи под ластиком
                 const eraserSize = pencilWidth * 2;
-                drawnStrokes = drawnStrokes.filter(stroke => {
-                    for (let i = 0; i < stroke.points.length; i++) {
-                        const point = stroke.points[i];
-                        const dist = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
-                        if (dist < eraserSize) {
-                            return false;
-                        }
-                        // Проверяем также пересечение с линией между точками
-                        if (i > 0) {
-                            const prevPoint = stroke.points[i - 1];
-                            const lineDist = distanceToLineSegment(x, y, prevPoint.x, prevPoint.y, point.x, point.y);
-                            if (lineDist < eraserSize) {
+
+                // Стираем штрихи под ластиком (если режим edge или both)
+                if (fillMode === 'edge' || fillMode === 'both') {
+                    drawnStrokes = drawnStrokes.filter(stroke => {
+                        for (let i = 0; i < stroke.points.length; i++) {
+                            const point = stroke.points[i];
+                            const dist = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
+                            if (dist < eraserSize) {
                                 return false;
                             }
+                            // Проверяем также пересечение с линией между точками
+                            if (i > 0) {
+                                const prevPoint = stroke.points[i - 1];
+                                const lineDist = distanceToLineSegment(x, y, prevPoint.x, prevPoint.y, point.x, point.y);
+                                if (lineDist < eraserSize) {
+                                    return false;
+                                }
+                            }
                         }
-                    }
-                    return true;
-                });
+                        return true;
+                    });
+                }
 
-                // Также стираем залитые области
-                for (const region of filledRegions) {
-                    if (x >= region.x && x < region.x + region.width &&
-                        y >= region.y && y < region.y + region.height) {
-                        // Стираем круг в imageData
-                        const pixels = region.imageData.data;
-                        for (let dy = -eraserSize; dy <= eraserSize; dy++) {
-                            for (let dx = -eraserSize; dx <= eraserSize; dx++) {
-                                const dist = Math.sqrt(dx * dx + dy * dy);
-                                if (dist <= eraserSize) {
-                                    const px = Math.floor(x - region.x + dx);
-                                    const py = Math.floor(y - region.y + dy);
-                                    if (px >= 0 && px < region.width && py >= 0 && py < region.height) {
-                                        const idx = (py * region.width + px) * 4;
-                                        pixels[idx + 3] = 0; // Делаем прозрачным
+                // Стираем залитые области (если режим interior или both)
+                if (fillMode === 'interior' || fillMode === 'both') {
+                    for (const region of filledRegions) {
+                        if (x >= region.x && x < region.x + region.width &&
+                            y >= region.y && y < region.y + region.height) {
+                            // Стираем круг в imageData
+                            const pixels = region.imageData.data;
+                            for (let dy = -eraserSize; dy <= eraserSize; dy++) {
+                                for (let dx = -eraserSize; dx <= eraserSize; dx++) {
+                                    const dist = Math.sqrt(dx * dx + dy * dy);
+                                    if (dist <= eraserSize) {
+                                        const px = Math.floor(x - region.x + dx);
+                                        const py = Math.floor(y - region.y + dy);
+                                        if (px >= 0 && px < region.width && py >= 0 && py < region.height) {
+                                            const idx = (py * region.width + px) * 4;
+                                            pixels[idx + 3] = 0; // Делаем прозрачным
+                                        }
                                     }
                                 }
                             }

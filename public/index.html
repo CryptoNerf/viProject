@@ -464,12 +464,14 @@
             bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
-            background: #d4d0c8;
+            background: rgba(212, 208, 200, 0.95);
             border: 2px outset #ffffff;
             box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
             padding: 10px;
+            padding-top: 25px;
             display: none;
             z-index: 15;
+            pointer-events: none; /* Панель прозрачна для событий мыши - можно рисовать сквозь неё */
         }
 
         #colorPalette.active {
@@ -478,6 +480,37 @@
 
         #colorPalette .color-section {
             margin-bottom: 8px;
+        }
+
+        /* Только конкретные интерактивные элементы внутри палитры ловят события */
+        #colorPalette button,
+        #colorPalette input,
+        #colorPalette .color-swatch,
+        #colorPalette .color-box,
+        #colorPalette label {
+            pointer-events: auto;
+        }
+
+        #paletteHandle {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: linear-gradient(to bottom, #ffffff, #d4d0c8);
+            border-bottom: 1px solid #808080;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #666;
+            user-select: none;
+            pointer-events: auto;
+        }
+
+        #paletteHandle:hover {
+            background: linear-gradient(to bottom, #e8e8e8, #c0c0c0);
         }
 
         #colorPalette .label-paint {
@@ -649,6 +682,20 @@
             <button id="unlockBtn">Разблокировать все</button>
             <button id="clearBtn">Очистить все</button>
             <button id="modeToggleBtn">🎨 Режим редактора</button>
+
+            <h3 style="margin-top: 15px; margin-bottom: 8px; font-size: 14px; border-top: 1px solid #ccc; padding-top: 10px;">📸 Экспорт</h3>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="exportWithBackground" checked>
+                <label for="exportWithBackground">С фоном</label>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                <button id="exportPngBtn" style="background: #4CAF50; color: white;">📷 Экспорт PNG</button>
+                <button id="recordVideoBtn" style="background: #f44336; color: white;">
+                    <span id="recordBtnText">🎥 Записать видео (10 сек)</span>
+                </button>
+            </div>
         </div>
 
         <div class="toggle-btn" id="toggleControls" title="Показать панель">⚙️</div>
@@ -678,6 +725,7 @@
 
         <!-- Paint палитра цветов -->
         <div id="colorPalette">
+            <div id="paletteHandle">⋮⋮ Перетащите для перемещения ⋮⋮</div>
             <div class="color-section">
                 <div class="label-paint">Цвета:</div>
                 <div id="colorGrid"></div>
@@ -1521,7 +1569,10 @@
             // НУЛЕВОЙ СЛОЙ: Фон (рисуется только если НЕ включено "показать видео")
             // В режиме "показать видео" фон уже нарисован в animate() - это видео с камеры
             if (!config.showVideo) {
-                if (backgroundType === 'video' && backgroundImage) {
+                if (backgroundType === 'transparent') {
+                    // Прозрачный фон - ничего не рисуем (для экспорта PNG/SVG)
+                    ctx.clearRect(0, 0, width, height);
+                } else if (backgroundType === 'video' && backgroundImage) {
                     // Видео фон рендерим каждый кадр (не кешируем)
                     const vidAspect = backgroundImage.videoWidth / backgroundImage.videoHeight;
                     const canvasAspect = width / height;
@@ -3588,6 +3639,169 @@
             molecules = [];
         });
 
+        // ЭКСПОРТ: PNG (с фоном или без в зависимости от галочки)
+        document.getElementById('exportPngBtn').addEventListener('click', () => {
+            const withBackground = document.getElementById('exportWithBackground').checked;
+
+            if (withBackground) {
+                // Экспорт с фоном - просто сохраняем текущий canvas
+                const link = document.createElement('a');
+                link.download = `molecules_${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                status.textContent = 'PNG экспортирован (с фоном)';
+            } else {
+                // Экспорт без фона - временно отключаем фон
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+
+                // Сохраняем настройки
+                const originalBgType = backgroundType;
+                const originalBgImage = backgroundImage;
+                const originalBgColor = backgroundColor;
+                const originalShowVideo = config.showVideo;
+
+                // Временно отключаем фон
+                backgroundType = 'transparent';
+                backgroundImage = null;
+                config.showVideo = false;
+
+                // Рисуем один кадр без фона на основном canvas
+                drawMetaballs();
+
+                // Копируем результат на временный canvas
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(canvas, 0, 0);
+
+                // Восстанавливаем настройки
+                backgroundType = originalBgType;
+                backgroundImage = originalBgImage;
+                backgroundColor = originalBgColor;
+                config.showVideo = originalShowVideo;
+
+                // Перерисовываем с фоном (чтобы вернуть на экран)
+                drawMetaballs();
+
+                // Экспортируем
+                const link = document.createElement('a');
+                link.download = `molecules_transparent_${Date.now()}.png`;
+                link.href = tempCanvas.toDataURL('image/png');
+                link.click();
+                status.textContent = 'PNG экспортирован (без фона)';
+            }
+        });
+
+        // ЭКСПОРТ: Запись видео
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let recordingStartTime = null;
+        let savedBackgroundSettings = null;
+
+        document.getElementById('recordVideoBtn').addEventListener('click', async () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                // Остановка записи
+                mediaRecorder.stop();
+
+                // Восстанавливаем фон, если он был отключен
+                if (savedBackgroundSettings) {
+                    backgroundType = savedBackgroundSettings.bgType;
+                    backgroundImage = savedBackgroundSettings.bgImage;
+                    backgroundColor = savedBackgroundSettings.bgColor;
+                    config.showVideo = savedBackgroundSettings.showVideo;
+                    savedBackgroundSettings = null;
+                    drawMetaballs();
+                }
+                return;
+            }
+
+            try {
+                const withBackground = document.getElementById('exportWithBackground').checked;
+
+                // Если запись без фона - сохраняем и отключаем фон
+                if (!withBackground) {
+                    savedBackgroundSettings = {
+                        bgType: backgroundType,
+                        bgImage: backgroundImage,
+                        bgColor: backgroundColor,
+                        showVideo: config.showVideo
+                    };
+
+                    backgroundType = 'transparent';
+                    backgroundImage = null;
+                    config.showVideo = false;
+                    drawMetaballs();
+                }
+
+                // Начинаем запись
+                const stream = canvas.captureStream(60); // 60 FPS
+                const options = { mimeType: 'video/webm;codecs=vp9' };
+
+                // Проверяем поддержку формата
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options.mimeType = 'video/webm'; // fallback
+                }
+
+                mediaRecorder = new MediaRecorder(stream, options);
+                recordedChunks = [];
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        recordedChunks.push(e.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `molecules_animation_${Date.now()}.webm`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+
+                    // Восстанавливаем фон, если он был отключен
+                    if (savedBackgroundSettings) {
+                        backgroundType = savedBackgroundSettings.bgType;
+                        backgroundImage = savedBackgroundSettings.bgImage;
+                        backgroundColor = savedBackgroundSettings.bgColor;
+                        config.showVideo = savedBackgroundSettings.showVideo;
+                        savedBackgroundSettings = null;
+                        drawMetaballs();
+                    }
+
+                    document.getElementById('recordBtnText').textContent = '🎥 Записать видео (10 сек)';
+                    status.textContent = 'Видео сохранено';
+                };
+
+                mediaRecorder.start();
+                recordingStartTime = Date.now();
+                document.getElementById('recordBtnText').textContent = '⏹️ Остановить запись';
+                status.textContent = withBackground ? 'Запись видео с фоном... (10 сек)' : 'Запись видео без фона... (10 сек)';
+
+                // Автоматическая остановка через 10 секунд
+                setTimeout(() => {
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                    }
+                }, 10000);
+
+            } catch (err) {
+                console.error('Ошибка записи видео:', err);
+                status.textContent = 'Ошибка записи видео';
+
+                // Восстанавливаем фон в случае ошибки
+                if (savedBackgroundSettings) {
+                    backgroundType = savedBackgroundSettings.bgType;
+                    backgroundImage = savedBackgroundSettings.bgImage;
+                    backgroundColor = savedBackgroundSettings.bgColor;
+                    config.showVideo = savedBackgroundSettings.showVideo;
+                    savedBackgroundSettings = null;
+                    drawMetaballs();
+                }
+            }
+        });
+
         // UI сворачивание/разворачивание панелей
         const gestureHint = document.getElementById('gestureHint');
         const controlsPanel = document.getElementById('controls');
@@ -3865,6 +4079,53 @@
         document.getElementById('stripeSpacing').addEventListener('input', (e) => {
             document.getElementById('stripeSpacingValue').textContent = e.target.value;
         });
+
+        // Перетаскивание палитры цветов
+        (function() {
+            const palette = document.getElementById('colorPalette');
+            const handle = document.getElementById('paletteHandle');
+            let isDragging = false;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            handle.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                const rect = palette.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+                palette.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+
+                // Вычисляем новую позицию
+                let newLeft = e.clientX - offsetX;
+                let newTop = e.clientY - offsetY;
+
+                // Ограничиваем перемещение в пределах окна
+                const paletteRect = palette.getBoundingClientRect();
+                const maxLeft = window.innerWidth - paletteRect.width;
+                const maxTop = window.innerHeight - paletteRect.height;
+
+                newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+                newTop = Math.max(0, Math.min(newTop, maxTop));
+
+                // Убираем центрирование и используем абсолютные координаты
+                palette.style.left = newLeft + 'px';
+                palette.style.top = newTop + 'px';
+                palette.style.bottom = 'auto';
+                palette.style.transform = 'none';
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    palette.style.cursor = '';
+                }
+            });
+        })();
 
         // Движение мыши в режиме редактора - для подсветки
         canvas.addEventListener('mousemove', (e) => {
@@ -4315,6 +4576,7 @@
             }
         });
 
+        // Локальный обработчик mouseup на canvas
         canvas.addEventListener('mouseup', () => {
             if (!editorMode || currentTool !== 'pencil' || !isDrawing) return;
 
@@ -4327,13 +4589,15 @@
             currentStroke = null;
         });
 
-        canvas.addEventListener('mouseleave', () => {
+        // Глобальный обработчик mouseup - на случай если кнопка отпущена вне canvas
+        document.addEventListener('mouseup', () => {
             if (!editorMode || currentTool !== 'pencil' || !isDrawing) return;
 
             isDrawing = false;
-            // Сохраняем штрих при выходе за пределы canvas
+            // Сохраняем завершенный штрих
             if (currentStroke && currentStroke.points.length > 1) {
                 drawnStrokes.push(currentStroke);
+                status.textContent = `Нарисовано ${drawnStrokes.length} штрихов`;
             }
             currentStroke = null;
         });

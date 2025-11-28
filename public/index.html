@@ -463,10 +463,18 @@
 
             /* Кнопка togglePalette выше, чтобы быть видимой */
             #togglePalette {
-                z-index: 15;
+                z-index: 20 !important; /* Выше всех элементов */
                 bottom: 15px;
                 left: 50%;
                 transform: translateX(-50%); /* Центрируем кнопку */
+                opacity: 1 !important; /* Принудительно видимая в режиме редактора */
+                pointer-events: auto !important; /* Принудительно кликабельная */
+            }
+
+            /* Но скрываем когда не в режиме редактора */
+            #togglePalette:not(.visible) {
+                opacity: 0 !important;
+                pointer-events: none !important;
             }
 
             /* Увеличиваем кнопку закрытия панелей на мобильных */
@@ -515,7 +523,7 @@
 
             /* Mobile-friendly color palette */
             #colorPalette {
-                display: block; /* Показываем палитру на мобильных */
+                display: block !important; /* Показываем палитру на мобильных, переопределяем базовый display: none */
                 left: 50%;
                 transform: translateX(-50%);
                 width: 95%;
@@ -528,6 +536,7 @@
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: thin;
                 transition: transform 0.3s ease, opacity 0.3s ease; /* Плавная анимация */
+                pointer-events: auto !important; /* Разрешаем взаимодействие с палитрой на мобильных */
             }
 
             #colorPalette::-webkit-scrollbar {
@@ -547,7 +556,7 @@
             #colorPalette.mobile-collapsed {
                 transform: translateX(-50%) translateY(calc(100% + 20px));
                 opacity: 0;
-                pointer-events: none;
+                pointer-events: none !important; /* Гарантированно блокируем взаимодействие когда скрыта */
             }
 
             #colorGrid {
@@ -4421,6 +4430,11 @@
         togglePaletteBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            console.log('🖱️ togglePalette touchstart fired!', {
+                isMobile,
+                paletteClasses: colorPalette.className,
+                buttonClasses: togglePaletteBtn.className
+            });
             togglePalette();
         }, { passive: false });
 
@@ -4520,6 +4534,13 @@
                 // Снимаем выделение со всех цветов палитры
                 document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
             });
+
+            // Инициализация палитры для мобильных устройств
+            if (isMobile) {
+                // При загрузке палитра скрыта (будет показана только в режиме редактора)
+                colorPalette.classList.add('mobile-collapsed');
+                console.log('📱 Палитра инициализирована для мобильных (скрыта)');
+            }
         }
 
         // Переключение режима
@@ -4529,7 +4550,7 @@
             const modeBtn = document.getElementById('modeToggleBtn');
             const modeIndicator = document.getElementById('modeIndicator');
             const paintToolbar = document.getElementById('paintToolbar');
-            const colorPalette = document.getElementById('colorPalette');
+            // colorPalette уже определена глобально, используем её
             const controlsPanel = document.getElementById('controls');
             const gestureHint = document.getElementById('gestureHint');
             const gestureDebugCheckbox = document.getElementById('gestureDebugCheckbox');
@@ -4550,6 +4571,10 @@
                     // Устанавливаем правильную иконку (палитра закрыта)
                     togglePaletteBtn.textContent = '🎨';
                     togglePaletteBtn.title = 'Показать палитру';
+                    console.log('📱 Режим редактора активирован на мобильном:', {
+                        buttonVisible: togglePaletteBtn.classList.contains('visible'),
+                        paletteCollapsed: colorPalette.classList.contains('mobile-collapsed')
+                    });
                 } else {
                     colorPalette.classList.add('active');
                 }
@@ -5209,6 +5234,7 @@
 
                     // Удаляем залитую область целиком (если режим interior или both)
                     if (fillMode === 'interior' || fillMode === 'both') {
+                        // Проверяем обычные заливки
                         const initialLength = filledRegions.length;
                         filledRegions = filledRegions.filter(region => {
                             // Проверяем попадает ли клик в эту область
@@ -5225,7 +5251,26 @@
                             }
                             return true;
                         });
-                        if (filledRegions.length < initialLength) {
+
+                        // Проверяем фоновые заливки
+                        const initialBgLength = backgroundFills.length;
+                        backgroundFills = backgroundFills.filter(region => {
+                            // Проверяем попадает ли клик в эту область
+                            if (x >= region.x && x < region.x + region.width &&
+                                y >= region.y && y < region.y + region.height) {
+                                // Проверяем не прозрачный ли пиксель под курсором
+                                const px = Math.floor(x - region.x);
+                                const py = Math.floor(y - region.y);
+                                const idx = (py * region.width + px) * 4;
+                                const alpha = region.imageData.data[idx + 3];
+                                if (alpha > 0) {
+                                    return false; // Удаляем всю область целиком
+                                }
+                            }
+                            return true;
+                        });
+
+                        if (filledRegions.length < initialLength || backgroundFills.length < initialBgLength) {
                             deletedSomething = true;
                             status.textContent = '🗑️ Заливка удалена';
                         }
@@ -5321,7 +5366,30 @@
 
                 // Стираем залитые области (если режим interior или both)
                 if (fillMode === 'interior' || fillMode === 'both') {
+                    // Стираем обычные заливки
                     for (const region of filledRegions) {
+                        if (x >= region.x && x < region.x + region.width &&
+                            y >= region.y && y < region.y + region.height) {
+                            // Стираем круг в imageData
+                            const pixels = region.imageData.data;
+                            for (let dy = -eraserSize; dy <= eraserSize; dy++) {
+                                for (let dx = -eraserSize; dx <= eraserSize; dx++) {
+                                    const dist = Math.sqrt(dx * dx + dy * dy);
+                                    if (dist <= eraserSize) {
+                                        const px = Math.floor(x - region.x + dx);
+                                        const py = Math.floor(y - region.y + dy);
+                                        if (px >= 0 && px < region.width && py >= 0 && py < region.height) {
+                                            const idx = (py * region.width + px) * 4;
+                                            pixels[idx + 3] = 0; // Делаем прозрачным
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Стираем фоновые заливки
+                    for (const region of backgroundFills) {
                         if (x >= region.x && x < region.x + region.width &&
                             y >= region.y && y < region.y + region.height) {
                             // Стираем круг в imageData
@@ -5349,28 +5417,38 @@
 
         // Локальный обработчик mouseup на canvas
         canvas.addEventListener('mouseup', () => {
-            if (!editorMode || currentTool !== 'pencil' || !isDrawing) return;
+            if (!editorMode) return;
+            if (currentTool !== 'pencil' && currentTool !== 'eraser') return;
+            if (!isDrawing) return;
 
             isDrawing = false;
-            // Сохраняем завершенный штрих
-            if (currentStroke && currentStroke.points.length > 1) {
-                drawnStrokes.push(currentStroke);
-                status.textContent = `Нарисовано ${drawnStrokes.length} штрихов`;
+
+            // Сохраняем завершенный штрих (только для карандаша)
+            if (currentTool === 'pencil') {
+                if (currentStroke && currentStroke.points.length > 1) {
+                    drawnStrokes.push(currentStroke);
+                    status.textContent = `Нарисовано ${drawnStrokes.length} штрихов`;
+                }
+                currentStroke = null;
             }
-            currentStroke = null;
         });
 
         // Глобальный обработчик mouseup - на случай если кнопка отпущена вне canvas
         document.addEventListener('mouseup', () => {
-            if (!editorMode || currentTool !== 'pencil' || !isDrawing) return;
+            if (!editorMode) return;
+            if (currentTool !== 'pencil' && currentTool !== 'eraser') return;
+            if (!isDrawing) return;
 
             isDrawing = false;
-            // Сохраняем завершенный штрих
-            if (currentStroke && currentStroke.points.length > 1) {
-                drawnStrokes.push(currentStroke);
-                status.textContent = `Нарисовано ${drawnStrokes.length} штрихов`;
+
+            // Сохраняем завершенный штрих (только для карандаша)
+            if (currentTool === 'pencil') {
+                if (currentStroke && currentStroke.points.length > 1) {
+                    drawnStrokes.push(currentStroke);
+                    status.textContent = `Нарисовано ${drawnStrokes.length} штрихов`;
+                }
+                currentStroke = null;
             }
-            currentStroke = null;
         });
 
         // === TOUCH СОБЫТИЯ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ===
@@ -5462,6 +5540,7 @@
                                     }
                                 }
                                 if (fillMode === 'interior' || fillMode === 'both') {
+                                    // Проверяем обычные заливки
                                     const initialLength = filledRegions.length;
                                     filledRegions = filledRegions.filter(region => {
                                         if (x >= region.x && x < region.x + region.width &&
@@ -5474,7 +5553,22 @@
                                         }
                                         return true;
                                     });
-                                    if (filledRegions.length < initialLength) {
+
+                                    // Проверяем фоновые заливки
+                                    const initialBgLength = backgroundFills.length;
+                                    backgroundFills = backgroundFills.filter(region => {
+                                        if (x >= region.x && x < region.x + region.width &&
+                                            y >= region.y && y < region.y + region.height) {
+                                            const px = Math.floor(x - region.x);
+                                            const py = Math.floor(y - region.y);
+                                            const idx = (py * region.width + px) * 4;
+                                            const alpha = region.imageData.data[idx + 3];
+                                            if (alpha > 0) return false;
+                                        }
+                                        return true;
+                                    });
+
+                                    if (filledRegions.length < initialLength || backgroundFills.length < initialBgLength) {
                                         deletedSomething = true;
                                         status.textContent = '🗑️ Заливка удалена';
                                     }
@@ -5682,7 +5776,29 @@
                             });
                         }
                         if (fillMode === 'interior' || fillMode === 'both') {
+                            // Стираем обычные заливки
                             for (const region of filledRegions) {
+                                if (x >= region.x && x < region.x + region.width &&
+                                    y >= region.y && y < region.y + region.height) {
+                                    const pixels = region.imageData.data;
+                                    for (let dy = -eraserSize; dy <= eraserSize; dy++) {
+                                        for (let dx = -eraserSize; dx <= eraserSize; dx++) {
+                                            const dist = Math.sqrt(dx * dx + dy * dy);
+                                            if (dist <= eraserSize) {
+                                                const px = Math.floor(x - region.x + dx);
+                                                const py = Math.floor(y - region.y + dy);
+                                                if (px >= 0 && px < region.width && py >= 0 && py < region.height) {
+                                                    const idx = (py * region.width + px) * 4;
+                                                    pixels[idx + 3] = 0;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Стираем фоновые заливки
+                            for (const region of backgroundFills) {
                                 if (x >= region.x && x < region.x + region.width &&
                                     y >= region.y && y < region.y + region.height) {
                                     const pixels = region.imageData.data;

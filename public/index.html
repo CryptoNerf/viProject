@@ -292,6 +292,11 @@
             color: #333;
         }
 
+        /* Скрываем кнопку закрытия палитры на десктопе */
+        #closePalette {
+            display: none;
+        }
+
         /* Виртуальные кнопки управления для мобильных */
         #virtualControls {
             position: absolute;
@@ -492,6 +497,11 @@
                 background: rgba(255, 100, 100, 0.25);
             }
 
+            /* Показываем кнопку закрытия палитры на мобильных */
+            #closePalette {
+                display: flex !important;
+            }
+
             #toggleHints {
                 top: 10px;
                 left: 10px;
@@ -672,6 +682,10 @@
         #colorPalette .color-box,
         #colorPalette label {
             pointer-events: auto;
+        }
+
+        #bgClearBtn {
+            margin-top: 0px;
         }
 
         #paletteHandle {
@@ -5645,9 +5659,9 @@
 
         // === ОБРАБОТЧИК КЛАВИАТУРЫ ДЛЯ ОТМЕНЫ ДЕЙСТВИЙ ===
         document.addEventListener('keydown', (e) => {
-            // Ctrl+Z или Cmd+Z (для Mac)
-            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-                console.log(`⌨️ Нажата комбинация Ctrl+Z`);
+            // Ctrl+Z или Cmd+Z (для Mac) - используем e.code для работы на любой раскладке
+            if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
+                console.log(`⌨️ Нажата комбинация Ctrl+Z (раскладка: ${e.key})`);
                 e.preventDefault(); // Предотвращаем стандартное поведение браузера
                 undo();
             }

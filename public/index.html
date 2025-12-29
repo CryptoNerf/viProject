@@ -774,19 +774,9 @@
 
         /* === PAINT РЕЖИМ РЕДАКТОРА === */
 
-        /* Панель инструментов слева (как в старом Paint) */
+        /* УСТАРЕЛО: Панель теперь объединена с #toolbox */
         #paintToolbar {
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 60px;
-            background: #d4d0c8;
-            border: 2px outset #ffffff;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
-            padding: 5px;
-            display: none; /* Скрыто по умолчанию */
-            z-index: 15;
+            display: none !important; /* Полностью скрыта */
         }
 
         #paintToolbar.active {
@@ -991,6 +981,167 @@
             color: #fff;
             border-style: inset;
         }
+
+        /* === ПАНЕЛЬ ИНСТРУМЕНТОВ === */
+        #toolbox {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            background: #d4d0c8;
+            padding: 10px;
+            border: 2px outset #ffffff;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            z-index: 15;
+            font-family: 'MS Sans Serif', sans-serif;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        #toolbox.minimized {
+            transform: translate(calc(-100% - 20px), -50%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .toolbox-section {
+            margin-bottom: 15px;
+        }
+
+        .toolbox-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .toolbox-title {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #000;
+            text-align: center;
+            padding: 4px;
+            background: #a0a0a4;
+            border: 1px solid #808080;
+        }
+
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+
+        .tool-btn {
+            width: 60px;
+            height: 60px;
+            padding: 4px;
+            margin: 0;
+            background: #d4d0c8;
+            border: 2px outset #ffffff;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: none;
+        }
+
+        .tool-btn:hover {
+            background: #e0dcd4;
+        }
+
+        .tool-btn:active, .tool-btn.active {
+            border-style: inset;
+            background: #b0b0b4;
+        }
+
+        .tool-label {
+            display: none; /* Скрываем подписи */
+        }
+
+        .tool-icon {
+            width: 48px; /* Увеличен размер */
+            height: 48px;
+            object-fit: contain;
+            pointer-events: none; /* Чтобы клики проходили на кнопку */
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 10px 4px;
+            margin: 0;
+            font-size: 20px;
+            background: #d4d0c8;
+            border: 2px outset #ffffff;
+            cursor: pointer;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .action-btn:hover {
+            background: #e0dcd4;
+        }
+
+        .action-btn:active {
+            border-style: inset;
+        }
+
+        .action-btn:disabled {
+            color: #808080;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .action-btn img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        /* Мобильная адаптация панели инструментов */
+        @media (max-width: 768px) {
+            #toolbox {
+                top: auto;
+                bottom: 70px;
+                left: 10px;
+                transform: none;
+                padding: 8px;
+                max-height: calc(100vh - 150px);
+                overflow-y: auto;
+            }
+
+            #toolbox.minimized {
+                transform: translateX(calc(-100% - 10px));
+                opacity: 0;
+            }
+
+            .tool-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+
+            .tool-icon {
+                width: 40px; /* Увеличен для мобильных */
+                height: 40px;
+            }
+
+            .action-btn {
+                font-size: 18px;
+                padding: 8px 2px;
+            }
+
+            .action-btn img {
+                width: 28px; /* Увеличен для мобильных */
+                height: 28px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1001,20 +1152,80 @@
         <div class="gesture-hint" id="gestureHint">
             <button class="close-panel" id="closeHints" title="Скрыть подсказки">×</button>
             <strong>Жесты:</strong>
-            <div>✌️ Щипок → создать молекулу</div>
+            <div>✌️ Щипок 1 сек → создать молекулу</div>
             <div>😮 Открыть рот → режим ✎</div>
             <div>✋ Ладонь → двигать молекулу</div>
             <div>✋ (в режиме ✎) → размер и форма</div>
             <div style="font-size: 10px; margin-left: 10px;">↳ ширина ладони = размер</div>
             <div style="font-size: 10px; margin-left: 10px;">↳ загнутые пальцы = форма</div>
-            <div>✊ Кулак 2 сек → фиксация молекулы</div>
-            <div>✊✊ Два кулака 2 сек → фиксация ВСЕХ</div>
+            <div>🤌 Все пальцы вместе 1 сек → фиксация молекулы</div>
+            <div>🤌🤌 Обе руки (пальцы вместе) 1 сек → фиксация ВСЕХ</div>
             <div>🤙 Мизинец → разблокировать</div>
-            <div>🤞 Скрещ. пальцы 2 сек → удалить</div>
+            <div>🤞 Скрещ. пальцы 1 сек → удалить</div>
             <div>🎤 Звук → деформация контура</div>
+            <strong style="margin-top: 8px; display: block;">Клавиатура:</strong>
+            <div>Ctrl+C → копировать молекулу</div>
+            <div>Ctrl+V → вставить молекулу</div>
+            <div>Ctrl+Z → отменить действие</div>
         </div>
 
         <div class="toggle-btn" id="toggleHints" title="Показать подсказки">💡</div>
+
+        <!-- Панель инструментов -->
+        <div id="toolbox">
+            <!-- Инструменты -->
+            <div class="toolbox-section">
+                <div class="toolbox-title">Инструменты</div>
+                <div class="tool-grid">
+                    <button class="tool-btn active" id="tool-select" title="Выбор молекулы: мышь = перемещение, Ctrl+мышь = размер, Shift+мышь = растяжение, Alt+мышь = вращение, колёсико = размер. Ctrl+C/V для копирования">
+                        <img src="icons/select.png" alt="Выбор" class="tool-icon">
+                        <div class="tool-label">Выбор</div>
+                    </button>
+                    <button class="tool-btn" id="tool-create" title="Создать молекулу (клик в любом месте)">
+                        <img src="icons/create.png" alt="Создать" class="tool-icon">
+                        <div class="tool-label">Создать</div>
+                    </button>
+                    <button class="tool-btn" id="tool-delete" title="Удалить молекулу (клик на молекулу)">
+                        <img src="icons/delete.png" alt="Удалить" class="tool-icon">
+                        <div class="tool-label">Удалить</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Действия с выбранной молекулой -->
+            <div class="toolbox-section">
+                <div class="toolbox-title">Выбранная</div>
+                <div class="action-grid">
+                    <button class="action-btn" id="action-lock" title="Зафиксировать выбранную молекулу">
+                        <img src="icons/lock.png" alt="Замок">
+                    </button>
+                    <button class="action-btn" id="action-unlock" title="Разблокировать выбранную молекулу">
+                        <img src="icons/unlock.png" alt="Разблокировать">
+                    </button>
+                </div>
+            </div>
+
+            <!-- Инструменты рисования -->
+            <div class="toolbox-section" id="paintToolsSection" style="display: none;">
+                <div class="toolbox-title">Рисование</div>
+                <div class="tool-grid">
+                    <button class="tool-btn paint-tool-btn" data-tool="fill" title="Заливка молекулы цветом">
+                        <img src="icons/fill.png" alt="Заливка" class="tool-icon">
+                        <div class="tool-label">Заливка</div>
+                    </button>
+                    <button class="tool-btn paint-tool-btn" data-tool="pencil" title="Рисовать карандашом">
+                        <img src="icons/pencil.png" alt="Карандаш" class="tool-icon">
+                        <div class="tool-label">Карандаш</div>
+                    </button>
+                    <button class="tool-btn paint-tool-btn" data-tool="eraser" title="Стереть рисунок">
+                        <img src="icons/eraser.png" alt="Ластик" class="tool-icon">
+                        <div class="tool-label">Ластик</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="toggle-btn" id="toggleToolbox" title="Показать инструменты" style="left: 20px; top: 20px;">🧰</div>
 
         <div id="controls">
             <button class="close-panel" id="closeControls" title="Скрыть панель">×</button>
@@ -1253,6 +1464,7 @@
         let audioFrequencyData = [];
         let isMouthOpen = false; // Текущее состояние рта
         let wasMouthOpen = false; // Предыдущее состояние рта для детекции открытия
+        let mouthOpenFrames = 0; // Счётчик кадров с открытым ртом для стабилизации
         let editingMolecule = null; // Молекула в режиме редактирования
         let hoveredMolecule = null; // Молекула на которую наведена рука СЕЙЧАС
         let lastHoveredMolecule = null; // Последняя молекула на которую наводились
@@ -1272,6 +1484,22 @@
 
         // === ФОРМЫ МОЛЕКУЛ ===
         let selectedShape = 'circle'; // Выбранная форма для создания молекул
+
+        // === UI ИНСТРУМЕНТЫ ДЛЯ МОЛЕКУЛ ===
+        let moleculeTool = 'select'; // select, create, delete
+        let selectedMoleculeUI = null; // Молекула выбранная через UI
+        let isDraggingMolecule = false; // Флаг перетаскивания/редактирования молекулы
+        let dragOffsetX = 0; // Смещение курсора относительно центра молекулы
+        let dragOffsetY = 0;
+        let editStartX = 0; // Начальная позиция для редактирования
+        let editStartY = 0;
+        let editStartRadius = 0; // Начальный размер молекулы
+        let editStartStretchX = 1; // Начальное растяжение по X
+        let editStartStretchY = 1; // Начальное растяжение по Y
+        let editStartAngle = 0; // Начальный угол поворота
+        let copiedMolecule = null; // Буфер обмена для молекул
+        let lastMouseX = 0; // Последняя позиция мыши для вставки
+        let lastMouseY = 0;
 
         // Настройки карандаша
         let pencilWidth = 3; // Толщина карандаша в пикселях
@@ -1312,10 +1540,10 @@
         // УЛУЧШЕНО v6: Сбалансированные требования - золотая середина
         // Это предотвращает "слетание" жестов и ложные срабатывания
         const GESTURE_STABILITY = {
-            pinch: { required: 6, history: [] },      // Щипок - требует 6 из 10 кадров (60%)
+            pinch: { required: 4, history: [] },      // Щипок - требует 4 из 10 кадров (40%) - СМЯГЧЕНО для стабильности
             pinky: { required: 5, history: [] },      // Мизинец - требует 5 из 10 (50%) - УСИЛЕНО для меньше ложных срабатываний
             crossed: { required: 6, history: [] },    // Скрещенные - требует 6 из 10 (60%)
-            fist: { required: 5, history: [] },       // Кулак - требует 5 из 10 (50%) - УСИЛЕНО для меньше ложных срабатываний
+            fist: { required: 4, history: [] },       // Все пальцы вместе - требует 4 из 10 (40%) - СМЯГЧЕНО для стабильности
             open: { required: 3, history: [] }        // Открытая ладонь - требует 3 из 10 (30%)
         };
 
@@ -1376,14 +1604,17 @@
         }
 
         // Таймеры для фиксации и удаления
-        const HOLD_DURATION = 2000; // 2 секунды в миллисекундах
-        const RESET_TOLERANCE = 300; // Толерантность перед сбросом таймера (мс)
-        let fistHoldStart = null; // Время начала удержания одного кулака на молекуле
-        let twoFistsHoldStart = null; // Время начала удержания двух кулаков
-        let fistHoldMolecule = null; // Молекула, над которой удерживается кулак
+        const HOLD_DURATION = 1000; // 1 секунда в миллисекундах (было 2000)
+        const RESET_TOLERANCE = 200; // Толерантность перед сбросом таймера (мс)
+        let fistHoldStart = null; // Время начала удержания жеста "пальцы вместе" на молекуле
+        let twoFistsHoldStart = null; // Время начала удержания жеста двумя руками
+        let fistHoldMolecule = null; // Молекула, над которой удерживается жест
         let crossedHoldStart = null; // Время начала удержания скрещенных пальцев
         let crossedHoldMolecule = null; // Молекула, которую хотят удалить
         let crossedHoldLostTime = null; // Время когда жест был потерян
+        let pinchHoldStarts = [null, null]; // Время начала удержания pinch для каждой руки
+        let pinchCreatedFlags = [false, false]; // Флаги: была ли уже создана молекула для каждой руки
+        let pinchReleaseTime = [null, null]; // Время когда pinch был отпущен (для предотвращения двойного создания)
 
         let config = {
             moleculeSize: 150, // УВЕЛИЧЕНО: было 100, теперь 150 - более заметный начальный размер
@@ -1405,9 +1636,9 @@
 
         // Параметры метаболлов
         // Мобильные устройства получают пониженное качество по умолчанию для лучшей производительности
-        let gridResolution = isMobile ? 20 : 15; // Разрешение сетки для marching squares (адаптивное)
-        const baseGridResolution = isMobile ? 20 : 15; // Базовое разрешение для хорошей производительности
-        const lowQualityGridResolution = isMobile ? 30 : 25; // Низкое качество при высокой нагрузке
+        let gridResolution = isMobile ? 15 : 10; // Разрешение сетки для marching squares (уменьшено для лучшей детализации)
+        const baseGridResolution = isMobile ? 15 : 10; // Базовое разрешение для хорошей детализации сердца
+        const lowQualityGridResolution = isMobile ? 25 : 20; // Низкое качество при высокой нагрузке
         let currentFillResolution = isMobile ? 6 : 4; // Текущее разрешение заливки (адаптивное)
 
         // Ограничение количества молекул на мобильных для производительности
@@ -1536,26 +1767,34 @@
 
         // SDF для сердца
         function sdfHeart(px, py, cx, cy, size) {
+            // Нормализуем координаты
             let x = (px - cx) / size;
             let y = (py - cy) / size;
 
-            // Переворачиваем и смещаем для правильной ориентации
-            y = -y + 0.5;
-            x *= 2.0;
-            y *= 2.0;
+            // Переворачиваем Y для правильной ориентации (сердце смотрит вниз)
+            y = -y;
 
-            // Точная формула сердца
+            // Масштабируем и центрируем
+            x *= 1.7;  // Немного уменьшен для более широкого сердца
+            y *= 1.7;
+            y += 0.2;  // Смещение вниз
+
+            // УЛУЧШЕННАЯ ФОРМУЛА СЕРДЦА с глубоким углублением
+            // Основана на уравнении: (x² + y² - 1)³ - x²y³ = 0
+
             const x2 = x * x;
             const y2 = y * y;
-            const z = x2 + y2 - 1.0;
-            const z2 = z * z;
-            const z3 = z2 * z;
 
-            // Implicit equation: (x^2 + y^2 - 1)^3 - x^2*y^3 = 0
-            const sdf = z3 - x2 * y2 * y;
+            // Основная формула сердца
+            const a = x2 + y2 - 1.0;
 
-            // Расстояние (приблизительное)
-            const dist = Math.sign(sdf) * Math.pow(Math.abs(sdf), 1.0 / 6.0);
+            // Увеличен коэффициент для БОЛЕЕ ГЛУБОКОГО углубления между долями
+            // Чем больше коэффициент, тем глубже углубление
+            const heartEq = a * a * a - x2 * y * y * y * 1.15;
+
+            // Вычисляем приблизительное расстояние
+            // Используем корень 6-й степени для сглаживания
+            const dist = Math.sign(heartEq) * Math.pow(Math.abs(heartEq), 1.0 / 6.0);
 
             return dist * size * 0.5;
         }
@@ -1570,31 +1809,39 @@
             x /= radius;
             y /= radius;
 
-            // 5-конечная звезда
-            const n = 5.0;
-            const m = 2.0; // Сколько лучей пропускаем
-            const an = Math.PI / n;
-            const en = Math.PI * m / n;
+            // 5-конечная звезда с более выраженными лучами
+            const n = 5.0; // Количество лучей
+            const m = 2.0; // Количество пропускаемых вершин (для пентаграммы)
 
             // Полярные координаты
             const r = Math.sqrt(x * x + y * y);
-            let a = Math.atan2(y, x) + Math.PI;
+            let angle = Math.atan2(y, x);
 
-            // Отражаем угол для симметрии
-            a = (a % (2.0 * an)) - an;
+            // Нормализуем угол в диапазон одного сектора
+            const an = Math.PI * 2.0 / n;
+            angle = ((angle + Math.PI) % an) - an / 2.0;
 
-            // Координаты луча звезды
-            const k1 = Math.cos(en);
-            const k2 = Math.sin(en);
+            // Внутренний и внешний радиусы звезды
+            const outerR = 1.0;
+            const innerR = 0.4; // Меньше значение = более острые лучи
 
-            const px2 = Math.cos(a) * r;
-            const py2 = Math.abs(Math.sin(a)) * r;
+            // Вычисляем SDF для треугольного луча
+            const cosAngle = Math.cos(angle);
+            const px2 = r * cosAngle;
+            const py2 = Math.abs(r * Math.sin(angle));
 
-            // SDF луча
-            const bn = (k1 * py2 - k2 * px2);
-            const dist = Math.max(bn, Math.abs(px2) - k1);
+            // Граница между внутренним и внешним радиусом
+            const angleAtInner = Math.asin(innerR * Math.sin(an / 2.0));
+            const k = Math.tan(an / 2.0 - angleAtInner);
 
-            return dist * radius * 0.85;
+            // Расстояние до края луча
+            const dist1 = py2 - k * (px2 - outerR);
+            const dist2 = px2 - outerR;
+            const dist3 = innerR - r;
+
+            const dist = Math.max(dist1, Math.max(dist2, dist3));
+
+            return dist * radius;
         }
 
         // SDF для круга (для единообразия)
@@ -1845,6 +2092,8 @@
                 if (!this.isLocked) {
                     this.x += (this.targetX - this.x) * 0.1;
                     this.y += (this.targetY - this.y) * 0.1;
+                    // Плавное изменение размера (только если не заблокирована)
+                    this.size += (this.targetSize - this.size) * 0.1;
                 }
 
                 // Плавная деформация (если форма не заблокирована)
@@ -1852,9 +2101,6 @@
                 if (!this.isShapeLocked) {
                     // Деформация применяется напрямую в режиме редактирования
                 }
-
-                // Плавное изменение размера
-                this.size += (this.targetSize - this.size) * 0.1;
 
                 // Обновляем фазу для звука
                 this.audioPhase += 0.05;
@@ -2018,27 +2264,60 @@
 
                 const effectiveSize = this.size * audioMod;
 
-                // Вычисляем SDF для каждой формы в молекуле
+                // ИСПРАВЛЕНО: Применяем деформацию ДО вычисления SDF
+                // Это преобразует точку (px, py) в локальную систему координат молекулы
+                let sampleX = px;
+                let sampleY = py;
+
+                if (this.deformAngle !== 0 || this.stretchX !== 1 || this.stretchY !== 1) {
+                    // Обновляем кеш тригонометрии если угол изменился
+                    if (this.deformAngle !== this._lastCachedAngle) {
+                        this._cachedCos = Math.cos(-this.deformAngle);
+                        this._cachedSin = Math.sin(-this.deformAngle);
+                        this._lastCachedAngle = this.deformAngle;
+                    }
+
+                    // Смещаем к центру молекулы
+                    const dx = px - this.x;
+                    const dy = py - this.y;
+
+                    // Поворачиваем в локальную систему координат
+                    const rotatedX = dx * this._cachedCos - dy * this._cachedSin;
+                    const rotatedY = dx * this._cachedSin + dy * this._cachedCos;
+
+                    // Применяем ОБРАТНОЕ растяжение к координатам
+                    // (делим на stretchX/Y чтобы сжать пространство обратно)
+                    const unstretchedX = rotatedX / this.stretchX;
+                    const unstretchedY = rotatedY / this.stretchY;
+
+                    // Поворачиваем обратно в мировую систему координат
+                    const cos = Math.cos(this.deformAngle);
+                    const sin = Math.sin(this.deformAngle);
+                    sampleX = this.x + unstretchedX * cos - unstretchedY * sin;
+                    sampleY = this.y + unstretchedX * sin + unstretchedY * cos;
+                }
+
+                // Вычисляем SDF для каждой формы в молекуле (используем деформированные координаты)
                 let combinedDist = Infinity;
 
                 if (!this.shapes || this.shapes.length === 0) {
                     // Нет форм - используем круг по умолчанию
-                    combinedDist = sdfCircle(px, py, this.x, this.y, effectiveSize);
+                    combinedDist = sdfCircle(sampleX, sampleY, this.x, this.y, effectiveSize);
                 } else if (this.shapes.length === 1) {
                     // Одна форма
                     const shape = this.shapes[0];
                     switch(shape.type) {
                         case 'triangle':
-                            combinedDist = sdfTriangle(px, py, this.x, this.y, effectiveSize);
+                            combinedDist = sdfTriangle(sampleX, sampleY, this.x, this.y, effectiveSize);
                             break;
                         case 'heart':
-                            combinedDist = sdfHeart(px, py, this.x, this.y, effectiveSize);
+                            combinedDist = sdfHeart(sampleX, sampleY, this.x, this.y, effectiveSize);
                             break;
                         case 'star':
-                            combinedDist = sdfStar(px, py, this.x, this.y, effectiveSize);
+                            combinedDist = sdfStar(sampleX, sampleY, this.x, this.y, effectiveSize);
                             break;
                         default: // circle
-                            combinedDist = sdfCircle(px, py, this.x, this.y, effectiveSize);
+                            combinedDist = sdfCircle(sampleX, sampleY, this.x, this.y, effectiveSize);
                     }
                 } else {
                     // Несколько форм - смешиваем SDF (smooth minimum)
@@ -2050,16 +2329,16 @@
                         let dist;
                         switch(shape.type) {
                             case 'triangle':
-                                dist = sdfTriangle(px, py, this.x, this.y, effectiveSize);
+                                dist = sdfTriangle(sampleX, sampleY, this.x, this.y, effectiveSize);
                                 break;
                             case 'heart':
-                                dist = sdfHeart(px, py, this.x, this.y, effectiveSize);
+                                dist = sdfHeart(sampleX, sampleY, this.x, this.y, effectiveSize);
                                 break;
                             case 'star':
-                                dist = sdfStar(px, py, this.x, this.y, effectiveSize);
+                                dist = sdfStar(sampleX, sampleY, this.x, this.y, effectiveSize);
                                 break;
                             default: // circle
-                                dist = sdfCircle(px, py, this.x, this.y, effectiveSize);
+                                dist = sdfCircle(sampleX, sampleY, this.x, this.y, effectiveSize);
                         }
 
                         // Smooth minimum для плавного смешивания форм
@@ -2070,28 +2349,6 @@
                     }
 
                     combinedDist = totalWeight > 0 ? sumWeightedDist / totalWeight : Infinity;
-                }
-
-                // Применяем растяжение (для всех форм)
-                // Растяжение работает через масштабирование расстояния
-                const dx = px - this.x;
-                const dy = py - this.y;
-
-                if (this.deformAngle !== 0 || this.stretchX !== 1 || this.stretchY !== 1) {
-                    // Обновляем кеш тригонометрии если угол изменился
-                    if (this.deformAngle !== this._lastCachedAngle) {
-                        this._cachedCos = Math.cos(-this.deformAngle);
-                        this._cachedSin = Math.sin(-this.deformAngle);
-                        this._lastCachedAngle = this.deformAngle;
-                    }
-
-                    // Поворачиваем точку
-                    const rotatedX = dx * this._cachedCos - dy * this._cachedSin;
-                    const rotatedY = dx * this._cachedSin + dy * this._cachedCos;
-
-                    // Применяем растяжение
-                    const stretchFactor = Math.sqrt(this.stretchX * this.stretchY);
-                    combinedDist *= stretchFactor;
                 }
 
                 // mergeStrength увеличивает радиус влияния
@@ -2509,12 +2766,38 @@
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
 
-                    ctx.beginPath();
-                    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-                    for (let i = 1; i < stroke.points.length; i++) {
-                        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+                    // Рисуем штрих по сегментам, пропуская стертые точки
+                    let isDrawingSegment = false;
+
+                    for (let i = 0; i < stroke.points.length; i++) {
+                        const point = stroke.points[i];
+
+                        // Пропускаем стертые точки
+                        if (point.erased) {
+                            if (isDrawingSegment) {
+                                // Заканчиваем текущий сегмент
+                                ctx.stroke();
+                                isDrawingSegment = false;
+                            }
+                            continue;
+                        }
+
+                        // Рисуем не стертые точки
+                        if (!isDrawingSegment) {
+                            // Начинаем новый сегмент
+                            ctx.beginPath();
+                            ctx.moveTo(point.x, point.y);
+                            isDrawingSegment = true;
+                        } else {
+                            // Продолжаем текущий сегмент
+                            ctx.lineTo(point.x, point.y);
+                        }
                     }
-                    ctx.stroke();
+
+                    // Завершаем последний сегмент
+                    if (isDrawingSegment) {
+                        ctx.stroke();
+                    }
                 }
 
                 // Рисуем текущий рисуемый штрих
@@ -2949,12 +3232,38 @@
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
 
-                ctx.beginPath();
-                ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-                for (let i = 1; i < stroke.points.length; i++) {
-                    ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+                // Рисуем штрих по сегментам, пропуская стертые точки
+                let isDrawing = false;
+
+                for (let i = 0; i < stroke.points.length; i++) {
+                    const point = stroke.points[i];
+
+                    // Пропускаем стертые точки
+                    if (point.erased) {
+                        if (isDrawing) {
+                            // Заканчиваем текущий сегмент
+                            ctx.stroke();
+                            isDrawing = false;
+                        }
+                        continue;
+                    }
+
+                    // Рисуем не стертые точки
+                    if (!isDrawing) {
+                        // Начинаем новый сегмент
+                        ctx.beginPath();
+                        ctx.moveTo(point.x, point.y);
+                        isDrawing = true;
+                    } else {
+                        // Продолжаем текущий сегмент
+                        ctx.lineTo(point.x, point.y);
+                    }
                 }
-                ctx.stroke();
+
+                // Завершаем последний сегмент
+                if (isDrawing) {
+                    ctx.stroke();
+                }
             }
 
             // Рисуем текущий рисуемый штрих
@@ -3099,21 +3408,37 @@
             return Math.sqrt(dx * dx + dy * dy);
         }
 
-        // НОВОЕ: Улучшенная детекция щипка - проверяем что это именно щипок, а не начало кулака
+        // НОВОЕ: Улучшенная детекция щипка - проверяем pinch с любым пальцем (не только указательным)
         function isPinching(landmarks) {
-            const pinchDist = getPinchDistance(landmarks);
+            const thumbTip = landmarks[4];
 
-            // Основной критерий - большой и указательный пальцы близко
-            if (pinchDist >= 0.05) return false;
+            // Проверяем расстояние от большого пальца до каждого пальца
+            const distances = {
+                index: Math.sqrt((thumbTip.x - landmarks[8].x) ** 2 + (thumbTip.y - landmarks[8].y) ** 2),
+                middle: Math.sqrt((thumbTip.x - landmarks[12].x) ** 2 + (thumbTip.y - landmarks[12].y) ** 2),
+                ring: Math.sqrt((thumbTip.x - landmarks[16].x) ** 2 + (thumbTip.y - landmarks[16].y) ** 2),
+                pinky: Math.sqrt((thumbTip.x - landmarks[20].x) ** 2 + (thumbTip.y - landmarks[20].y) ** 2)
+            };
 
-            // ВАЖНО: Проверяем что другие пальцы НЕ сжаты в кулак
-            // При настоящем щипке средний, безымянный и мизинец должны быть относительно открыты
+            // Находим минимальное расстояние (какой палец ближе всего к большому)
+            const minDist = Math.min(distances.index, distances.middle, distances.ring, distances.pinky);
+
+            // СМЯГЧЕНО: Pinch если палец достаточно близко к большому
+            if (minDist >= 0.055) return false;  // Было 0.035, теперь мягче для стабильности
+
+            // ВАЖНО: Проверяем что это не жест "все пальцы вместе"
+            // При pinch хотя бы некоторые пальцы должны быть открыты
             const palmCenter = landmarks[9];
             const middleTip = landmarks[12];
             const ringTip = landmarks[16];
             const pinkyTip = landmarks[20];
+            const indexTip = landmarks[8];
 
-            // Расстояния других пальцев от центра ладони
+            // Расстояния пальцев от центра ладони
+            const indexFromPalm = Math.sqrt(
+                (indexTip.x - palmCenter.x) ** 2 +
+                (indexTip.y - palmCenter.y) ** 2
+            );
             const middleFromPalm = Math.sqrt(
                 (middleTip.x - palmCenter.x) ** 2 +
                 (middleTip.y - palmCenter.y) ** 2
@@ -3127,16 +3452,15 @@
                 (pinkyTip.y - palmCenter.y) ** 2
             );
 
-            // Считаем сколько пальцев относительно открыты
-            // Если палец далеко от ладони - он открыт
+            // Считаем сколько пальцев открыты (СМЯГЧЕНО: уменьшен порог)
             let openFingersCount = 0;
-            if (middleFromPalm > 0.10) openFingersCount++;
-            if (ringFromPalm > 0.09) openFingersCount++;
+            if (indexFromPalm > 0.08) openFingersCount++;
+            if (middleFromPalm > 0.08) openFingersCount++;
+            if (ringFromPalm > 0.08) openFingersCount++;
             if (pinkyFromPalm > 0.08) openFingersCount++;
 
-            // Для щипка минимум 2 из 3 пальцев должны быть открыты
-            // Это предотвращает ложное срабатывание при формировании кулака
-            return openFingersCount >= 2;
+            // СМЯГЧЕНО: Для щипка минимум 1 палец должен быть открыт (не "все пальцы вместе")
+            return openFingersCount >= 1;
         }
 
         // НОВОЕ: Улучшенная детекция загнутых пальцев для режима редактирования
@@ -3291,84 +3615,83 @@
         }
 
         function isHandFist(landmarks) {
-            // УЛУЧШЕНО v5: Максимально мягкая проверка кулака
-            const palmCenter = landmarks[9];
-            const palm = landmarks[0];
+            // НОВАЯ ЛОГИКА: Щипок всеми пальцами (все кончики пальцев собраны вместе)
+            // ВАЖНО: должен отличаться от обычного pinch
 
-            const fingerPairs = [
-                { tip: landmarks[8], base: landmarks[5], name: 'index' },    // Указательный
-                { tip: landmarks[12], base: landmarks[9], name: 'middle' },  // Средний
-                { tip: landmarks[16], base: landmarks[13], name: 'ring' },   // Безымянный
-                { tip: landmarks[20], base: landmarks[17], name: 'pinky' }   // Мизинец
+            // Кончики всех 5 пальцев
+            const fingerTips = [
+                landmarks[4],  // Большой
+                landmarks[8],  // Указательный
+                landmarks[12], // Средний
+                landmarks[16], // Безымянный
+                landmarks[20]  // Мизинец
             ];
 
-            let closedCount = 0;
-            const fingerDistances = [];
+            // Вычисляем центр всех кончиков пальцев
+            let centerX = 0, centerY = 0;
+            fingerTips.forEach(tip => {
+                centerX += tip.x;
+                centerY += tip.y;
+            });
+            centerX /= fingerTips.length;
+            centerY /= fingerTips.length;
 
-            fingerPairs.forEach(finger => {
-                // Проверяем что кончик близко к основанию (палец согнут)
-                const tipToBase = Math.sqrt(
-                    (finger.tip.x - finger.base.x) ** 2 +
-                    (finger.tip.y - finger.base.y) ** 2
+            // Проверяем что каждый кончик пальца близко к центру
+            let maxDistanceFromCenter = 0;
+            let fingersCloseCount = 0;
+            const distances = [];
+
+            fingerTips.forEach(tip => {
+                const dist = Math.sqrt(
+                    (tip.x - centerX) ** 2 +
+                    (tip.y - centerY) ** 2
                 );
+                distances.push(dist);
+                maxDistanceFromCenter = Math.max(maxDistanceFromCenter, dist);
 
-                // И кончик близко к центру ладони
-                const tipToPalm = Math.sqrt(
-                    (finger.tip.x - palmCenter.x) ** 2 +
-                    (finger.tip.y - palmCenter.y) ** 2
-                );
-
-                fingerDistances.push({
-                    name: finger.name,
-                    tipToBase: tipToBase.toFixed(3),
-                    tipToPalm: tipToPalm.toFixed(3)
-                });
-
-                // СБАЛАНСИРОВАНО v6: Золотая середина
-                // tipToBase < 0.14 - расстояние кончик-основание
-                // tipToPalm < 0.19 - расстояние кончик-центр ладони
-                if (tipToBase < 0.14 && tipToPalm < 0.19) {
-                    closedCount++;
+                // Порог для "близко" - палец считается близким если в радиусе 0.06
+                if (dist < 0.06) {
+                    fingersCloseCount++;
                 }
             });
 
-            // Большой палец - проверяем что он близко к ладони
+            // КЛЮЧЕВОЕ ОТЛИЧИЕ ОТ PINCH: проверяем что это не просто два пальца вместе
+            // При обычном pinch: два пальца очень близко, остальные далеко
             const thumbTip = landmarks[4];
-            const thumbToPalm = Math.sqrt(
-                (thumbTip.x - palmCenter.x) ** 2 +
-                (thumbTip.y - palmCenter.y) ** 2
-            );
+            const pinchDistances = [
+                Math.sqrt((thumbTip.x - landmarks[8].x) ** 2 + (thumbTip.y - landmarks[8].y) ** 2),
+                Math.sqrt((thumbTip.x - landmarks[12].x) ** 2 + (thumbTip.y - landmarks[12].y) ** 2),
+                Math.sqrt((thumbTip.x - landmarks[16].x) ** 2 + (thumbTip.y - landmarks[16].y) ** 2),
+                Math.sqrt((thumbTip.x - landmarks[20].x) ** 2 + (thumbTip.y - landmarks[20].y) ** 2)
+            ];
 
-            // СБАЛАНСИРОВАНО: Золотая середина для большого пальца
-            const thumbClosed = thumbToPalm < 0.18;
+            // Считаем сколько пальцев далеко от большого
+            let fingersAwayFromThumb = 0;
+            pinchDistances.forEach(d => { if (d > 0.08) fingersAwayFromThumb++; });
 
-            // Проверка на щипок
-            const thumbIndexDist = Math.sqrt(
-                (thumbTip.x - landmarks[8].x) ** 2 +
-                (thumbTip.y - landmarks[8].y) ** 2
-            );
-            const notPinching = thumbIndexDist > 0.05;
+            // Это обычный pinch если 1-2 пальца у большого, а 2-3 пальца далеко
+            const minPinchDist = Math.min(...pinchDistances);
+            const isPinchLike = fingersAwayFromThumb >= 2 && minPinchDist < 0.05;
 
-            // СБАЛАНСИРОВАНО v6: Кулак = 3 из 4 пальцев + проверка компактности
-            // Проверяем что пальцы в среднем близко к ладони (не растопырены)
-            const avgTipToPalm = fingerDistances.reduce((sum, f) => sum + parseFloat(f.tipToPalm), 0) / 4;
-            const isCompact = avgTipToPalm < 0.17; // Средняя близость всех пальцев
+            // Все пальцы собраны вместе если:
+            // 1. Максимальное расстояние от центра < 0.09 (все пальцы в кучке)
+            // 2. Минимум 3 из 5 пальцев близко к центру
+            // 3. Это НЕ обычный pinch (не ситуация "два пальца вместе, остальные далеко")
+            const allFingersTogether = maxDistanceFromCenter < 0.09 && fingersCloseCount >= 3 && !isPinchLike;
 
-            const isFist = closedCount >= 3 && thumbClosed && notPinching && isCompact;
+            const isFist = allFingersTogether;
 
-            // ОТЛАДКА: Логируем только когда почти кулак (для диагностики)
-            // Раскомментируйте следующие строки для отладки:
-            // if (closedCount >= 1 || thumbToPalm < 0.22) {
-            //     console.log('🔍 Fist Debug:', {
-            //         closedCount: `${closedCount}/4`,
-            //         thumbToPalm: thumbToPalm.toFixed(3),
-            //         thumbClosed,
-            //         notPinching,
-            //         thumbIndexDist: thumbIndexDist.toFixed(3),
-            //         isFist,
-            //         fingers: fingerDistances
-            //     });
-            // }
+            // ОТЛАДКА: временно включена
+            if (fingersCloseCount >= 2) {
+                console.log('🔍 All Fingers Together Debug:', {
+                    maxDistFromCenter: maxDistanceFromCenter.toFixed(3),
+                    fingersCloseCount: `${fingersCloseCount}/5`,
+                    fingersAwayFromThumb: `${fingersAwayFromThumb}/4`,
+                    minPinchDist: minPinchDist.toFixed(3),
+                    isPinchLike,
+                    isFist
+                });
+            }
 
             return isFist;
         }
@@ -3415,7 +3738,7 @@
                 (thumbTip.y - indexTip.y) ** 2
             );
 
-            // 5. Не кулак
+            // 5. Не жест "все пальцы вместе"
             const thumbToPalm = Math.sqrt(
                 (thumbTip.x - palmCenter.x) ** 2 +
                 (thumbTip.y - palmCenter.y) ** 2
@@ -3541,16 +3864,22 @@
                 pinky: Math.sqrt((thumbTip.x - landmarks[20].x) ** 2 + (thumbTip.y - landmarks[20].y) ** 2)
             };
 
-            // Находим минимальное расстояние
+            // Порог касания - палец должен быть достаточно близко к большому пальцу
+            const touchThreshold = 0.055; // СМЯГЧЕНО для стабильности (было 0.05)
+
+            // Проверяем какой палец касается большого (приоритет у более дальних пальцев)
+            // Проверяем в обратном порядке чтобы приоритет был у необычных жестов
+            if (distances.pinky < touchThreshold) return 'star';        // Большой + мизинец = звезда
+            if (distances.ring < touchThreshold) return 'heart';        // Большой + безымянный = сердце
+            if (distances.middle < touchThreshold) return 'triangle';   // Большой + средний = треугольник
+            if (distances.index < touchThreshold) return 'circle';      // Большой + указательный = круг
+
+            // Если ни один палец не касается достаточно близко, используем ближайший
             const minDist = Math.min(distances.index, distances.middle, distances.ring, distances.pinky);
-
-            // Определяем какой палец ближе всего к большому
-            if (minDist === distances.index) return 'circle';      // Большой + указательный = круг
-            if (minDist === distances.middle) return 'triangle';   // Большой + средний = треугольник
-            if (minDist === distances.ring) return 'heart';        // Большой + безымянный = сердце
-            if (minDist === distances.pinky) return 'star';        // Большой + мизинец = звезда
-
-            return 'circle'; // По умолчанию круг
+            if (minDist === distances.pinky) return 'star';
+            if (minDist === distances.ring) return 'heart';
+            if (minDist === distances.middle) return 'triangle';
+            return 'circle'; // По умолчанию или если указательный ближе всех
         }
 
         // УЛУЧШЕНО: Определение основного жеста с приоритетом (для избежания конфликтов)
@@ -3576,19 +3905,7 @@
             };
 
             // ПРИОРИТЕТ ЖЕСТОВ (от высокого к низкому):
-            // 1. Щипок - для создания молекул (самый специфичный)
-            if (stableGestures.isPinching) {
-                return {
-                    isPinching: true,
-                    isPinky: false,
-                    isCrossed: false,
-                    isFist: false,
-                    isOpen: false,
-                    primaryGesture: 'pinch'
-                };
-            }
-
-            // 2. Мизинец - для разблокировки (очень специфичный жест)
+            // 1. Мизинец - для разблокировки (очень специфичный жест)
             if (stableGestures.isPinky) {
                 return {
                     isPinching: false,
@@ -3600,7 +3917,7 @@
                 };
             }
 
-            // 3. Скрещенные пальцы - для удаления (специфичный)
+            // 2. Скрещенные пальцы - для удаления (специфичный)
             if (stableGestures.isCrossed) {
                 return {
                     isPinching: false,
@@ -3612,7 +3929,8 @@
                 };
             }
 
-            // 4. Кулак - для фиксации (более общий)
+            // 3. Все пальцы вместе - для фиксации (ПРИОРИТЕТ НАД PINCH!)
+            // ВАЖНО: должен проверяться РАНЬШЕ чем обычный pinch
             if (stableGestures.isFist) {
                 return {
                     isPinching: false,
@@ -3621,6 +3939,18 @@
                     isFist: true,
                     isOpen: false,
                     primaryGesture: 'fist'
+                };
+            }
+
+            // 4. Щипок - для создания молекул (после проверки "все пальцы вместе")
+            if (stableGestures.isPinching) {
+                return {
+                    isPinching: true,
+                    isPinky: false,
+                    isCrossed: false,
+                    isFist: false,
+                    isOpen: false,
+                    primaryGesture: 'pinch'
                 };
             }
 
@@ -3740,23 +4070,58 @@
                     newHands.push(handData);
                     currentFrame.push(handData);
 
-                    // Создание молекулы при щипке (но НЕ при кулаке и других жестах!)
+                    // Создание молекулы при щипке с ЗАДЕРЖКОЙ 1 секунда
                     // УЛУЧШЕНО: добавлена проверка на скрещенные пальцы и мизинец
-                    if (isPinching && !isFist && !isCrossed && !isPinky && !previousPinchStates[idx]) {
-                        // Ограничение количества молекул для производительности (особенно на мобильных)
-                        if (molecules.length < maxMolecules) {
-                            // Определяем форму по жесту или используем выбранную в UI
-                            const shapeFromGesture = getShapeFromPinch(landmarks);
-                            const molecule = new Molecule(
-                                handX,
-                                handY,
-                                config.moleculeSize
-                            );
-                            // Устанавливаем форму - приоритет у жеста, но если жест дал круг, используем selectedShape
-                            const finalShape = shapeFromGesture === 'circle' ? selectedShape : shapeFromGesture;
-                            molecule.shapes = [{type: finalShape, weight: 1}];
-                            molecules.push(molecule);
-                            saveState(); // Сохраняем состояние для отмены
+                    if (isPinching && !isFist && !isCrossed && !isPinky) {
+                        // Сбрасываем время отпускания если pinch снова активен
+                        pinchReleaseTime[idx] = null;
+
+                        // Начинаем или продолжаем отсчет времени удержания pinch
+                        if (pinchHoldStarts[idx] === null) {
+                            pinchHoldStarts[idx] = Date.now();
+                            // НЕ сбрасываем pinchCreatedFlags здесь - он сбросится только после полного отпускания
+                        } else if (!pinchCreatedFlags[idx]) {
+                            // Проверяем прошла ли 1 секунда
+                            const holdTime = Date.now() - pinchHoldStarts[idx];
+                            if (holdTime >= HOLD_DURATION) {
+                                // Ограничение количества молекул для производительности
+                                if (molecules.length < maxMolecules) {
+                                    // Определяем форму по жесту (какой палец ближе к большому)
+                                    const shapeFromGesture = getShapeFromPinch(landmarks);
+                                    console.log('Создание молекулы через жест (удержание 1 сек), форма:', shapeFromGesture);
+                                    const molecule = new Molecule(
+                                        handX,
+                                        handY,
+                                        config.moleculeSize
+                                    );
+                                    // Устанавливаем форму напрямую из жеста
+                                    molecule.shapes = [{type: shapeFromGesture, weight: 1}];
+                                    molecules.push(molecule);
+                                    saveState(); // Сохраняем состояние для отмены
+                                    pinchCreatedFlags[idx] = true; // Помечаем что молекула создана
+                                }
+                            }
+                        }
+                    } else {
+                        // Pinch отпущен
+                        pinchHoldStarts[idx] = null;
+
+                        // Если молекула была создана - запоминаем время отпускания для задержки сброса
+                        if (pinchCreatedFlags[idx]) {
+                            if (pinchReleaseTime[idx] === null) {
+                                pinchReleaseTime[idx] = Date.now();
+                            }
+
+                            // Сбрасываем флаг только после 500 мс без pinch (чтобы избежать двойного создания)
+                            const timeSinceRelease = Date.now() - pinchReleaseTime[idx];
+                            if (timeSinceRelease >= 500) {
+                                pinchCreatedFlags[idx] = false;
+                                pinchReleaseTime[idx] = null;
+                            }
+                        } else {
+                            // Если молекула не была создана - можно сбросить сразу
+                            pinchCreatedFlags[idx] = false;
+                            pinchReleaseTime[idx] = null;
                         }
                     }
 
@@ -3873,7 +4238,18 @@
                         const mouthOpenDistance = Math.abs(lowerLip.y - upperLip.y);
 
                         // Если расстояние больше порога - рот открыт
-                        isMouthOpen = mouthOpenDistance > 0.02; // Подобранный порог
+                        // СТРОЖЕ: увеличен порог для предотвращения ложных срабатываний
+                        const rawMouthOpen = mouthOpenDistance > 0.035; // Было 0.02, теперь строже
+
+                        // СТАБИЛИЗАЦИЯ: рот должен быть открыт несколько кадров подряд
+                        if (rawMouthOpen) {
+                            mouthOpenFrames++;
+                        } else {
+                            mouthOpenFrames = 0;
+                        }
+
+                        // Рот считается открытым только если был открыт минимум 3 кадра подряд
+                        isMouthOpen = mouthOpenFrames >= 3;
 
                         // TOGGLE режима редактирования при открытии рта
                         if (isMouthOpen && !wasMouthOpen) {
@@ -3901,15 +4277,18 @@
                     } else {
                         isMouthOpen = false;
                         wasMouthOpen = false;
+                        mouthOpenFrames = 0;
                     }
                 } else {
                     isMouthOpen = false;
                     wasMouthOpen = false;
+                    mouthOpenFrames = 0;
                 }
             } catch (error) {
                 console.warn('Ошибка в onFaceResults:', error);
                 isMouthOpen = false;
                 wasMouthOpen = false;
+                mouthOpenFrames = 0;
             }
         }
 
@@ -3998,6 +4377,7 @@
                     stretchX: mol.stretchX,
                     stretchY: mol.stretchY,
                     deformAngle: mol.deformAngle,
+                    shapes: mol.shapes ? mol.shapes.map(s => ({type: s.type, weight: s.weight})) : [{type: 'circle', weight: 1}], // ИСПРАВЛЕНО: сохраняем формы
                     fillColor: mol.fillColor,
                     edgeColor: mol.edgeColor,
                     emboss: mol.emboss,
@@ -4008,7 +4388,7 @@
                     stripeSpacing: mol.stripeSpacing
                 })),
                 drawnStrokes: drawnStrokes.map(stroke => ({
-                    points: stroke.points.map(p => ({x: p.x, y: p.y})),
+                    points: stroke.points.map(p => ({x: p.x, y: p.y, erased: p.erased})),
                     color: stroke.color,
                     width: stroke.width
                 })),
@@ -4106,7 +4486,7 @@
             });
 
             drawnStrokes = state.drawnStrokes.map(stroke => ({
-                points: stroke.points.map(p => ({x: p.x, y: p.y})),
+                points: stroke.points.map(p => ({x: p.x, y: p.y, erased: p.erased})),
                 color: stroke.color,
                 width: stroke.width
             }));
@@ -4199,7 +4579,7 @@
             const fists = hands.filter(h => h.isFist);
             const twoFistsStable = checkStableTwoHands('isFist');
 
-            // ФИКСАЦИЯ ВСЕХ МОЛЕКУЛ - два кулака удерживать 2 секунды
+            // ФИКСАЦИЯ ВСЕХ МОЛЕКУЛ - жест "пальцы вместе" двумя руками удерживать 2 секунды
             if (fists.length === 2 && twoFistsStable) {
                 if (twoFistsHoldStart === null) {
                     twoFistsHoldStart = Date.now();
@@ -4221,7 +4601,7 @@
                 twoFistsHoldStart = null;
             }
 
-            // ФИКСАЦИЯ ОДНОЙ МОЛЕКУЛЫ - один кулак над молекулой удерживать 2 секунды
+            // ФИКСАЦИЯ ОДНОЙ МОЛЕКУЛЫ - жест "пальцы вместе" над молекулой удерживать 2 секунды
             if (fists.length === 1 && hands.length === 1) {
                 const fist = fists[0];
                 let closestMol = null;
@@ -4625,6 +5005,43 @@
                     ctx.strokeText('ВЫБРАНА', mol.x, mol.y - mol.size - 10);
                     ctx.fillText('ВЫБРАНА', mol.x, mol.y - mol.size - 10);
                 }
+
+                // UI ИНСТРУМЕНТЫ: Подсветка молекулы выбранной через панель инструментов
+                if (!editorMode && mol === selectedMoleculeUI) {
+                    // Синий пульсирующий контур с более яркой анимацией
+                    const pulse = 0.7 + Math.sin(Date.now() / 250) * 0.3;
+                    ctx.strokeStyle = `rgba(0, 150, 255, ${pulse})`;
+                    ctx.lineWidth = 5;
+                    ctx.setLineDash([10, 5]);
+                    ctx.beginPath();
+                    ctx.arc(mol.x, mol.y, mol.size * 1.2, 0, Math.PI * 2); // ИСПРАВЛЕНО: size вместо radius
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Дополнительный внутренний круг
+                    ctx.strokeStyle = `rgba(100, 200, 255, ${0.5 + pulse * 0.3})`;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(mol.x, mol.y, mol.size * 0.9, 0, Math.PI * 2); // ИСПРАВЛЕНО: size вместо radius
+                    ctx.stroke();
+
+                    // Метка в зависимости от инструмента
+                    let labelText = 'ВЫБРАНА';
+                    let labelIcon = '👆';
+                    if (moleculeTool === 'delete') {
+                        labelText = 'УДАЛЕНИЕ';
+                        labelIcon = '🗑️';
+                    }
+
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillStyle = 'rgba(0, 150, 255, 0.95)';
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                    ctx.lineWidth = 3;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.strokeText(`${labelIcon} ${labelText}`, mol.x, mol.y - mol.size - 10); // ИСПРАВЛЕНО: size вместо radius
+                    ctx.fillText(`${labelIcon} ${labelText}`, mol.x, mol.y - mol.size - 10); // ИСПРАВЛЕНО: size вместо radius
+                }
             });
 
             // Визуализация рук
@@ -4642,7 +5059,7 @@
                     label = '🤞';
                 } else if (hand.isFist) {
                     color = 'rgba(255, 150, 50, 0.6)';
-                    label = '✊';
+                    label = '🤌';
                 } else if (hand.isOpen) {
                     color = 'rgba(100, 255, 100, 0.6)';
                     label = '✋';
@@ -4666,6 +5083,27 @@
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(label, hand.x, hand.y - 35);
+                }
+
+                // Индикатор прогресса удержания pinch для создания молекулы
+                if (hand.isPinching && !hand.isFist && !hand.isCrossed && !hand.isPinky) {
+                    const idx = hands.indexOf(hand);
+                    if (pinchHoldStarts[idx] !== null && !pinchCreatedFlags[idx]) {
+                        const holdTime = Date.now() - pinchHoldStarts[idx];
+                        const progress = Math.min(holdTime / HOLD_DURATION, 1);
+
+                        // Рисуем круговой индикатор прогресса
+                        ctx.strokeStyle = 'rgba(50, 200, 50, 0.8)';
+                        ctx.lineWidth = 4;
+                        ctx.beginPath();
+                        ctx.arc(hand.x, hand.y, 25, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+                        ctx.stroke();
+
+                        // Текст с процентами
+                        ctx.fillStyle = 'rgba(50, 200, 50, 0.9)';
+                        ctx.font = 'bold 12px Arial';
+                        ctx.fillText(`${Math.round(progress * 100)}%`, hand.x, hand.y + 45);
+                    }
                 }
             });
 
@@ -4779,7 +5217,7 @@
 
                 // Иконки для жестов
                 const gestureIcons = {
-                    'fist': '✊',
+                    'fist': '🤌',
                     'open': '✋',
                     'pinch': '🤏',
                     'crossed': '🤞',
@@ -4800,7 +5238,7 @@
 
                     const icon = gestureIcons[gesture] || '❓';
                     const gestureName = {
-                        'fist': 'Кулак',
+                        'fist': 'Пальцы вместе',
                         'open': 'Открыта',
                         'pinch': 'Щипок',
                         'crossed': 'Скрещены',
@@ -4820,7 +5258,7 @@
                         const percent = Math.round((count / GESTURE_HISTORY_SIZE) * 100);
                         const stableIcon = count >= required ? '✓' : '○';
                         const nameRu = {
-                            'fist': 'Кулак',
+                            'fist': 'Пальцы вместе',
                             'pinch': 'Щипок',
                             'crossed': 'Скрещены',
                             'pinky': 'Мизинец',
@@ -4921,6 +5359,13 @@
 
         document.getElementById('shapeSelector').addEventListener('change', (e) => {
             selectedShape = e.target.value;
+
+            // Если есть выбранная молекула через UI инструменты - меняем её форму
+            if (selectedMoleculeUI && moleculeTool === 'select') {
+                selectedMoleculeUI.shapes = [{type: selectedShape, weight: 1}];
+                saveState();
+                status.textContent = `✨ Форма молекулы изменена на: ${selectedShape}`;
+            }
         });
 
         document.getElementById('mergeSlider').addEventListener('input', (e) => {
@@ -5149,6 +5594,81 @@
             toggleControlsBtn.classList.remove('visible');
         });
 
+        // === ПАНЕЛЬ ИНСТРУМЕНТОВ ===
+        const toolbox = document.getElementById('toolbox');
+        const toggleToolboxBtn = document.getElementById('toggleToolbox');
+
+        // Показать/скрыть панель инструментов
+        toggleToolboxBtn.addEventListener('click', () => {
+            toolbox.classList.toggle('minimized');
+            toggleToolboxBtn.classList.toggle('visible');
+        });
+
+        // Выбор инструмента
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Пропускаем кнопки рисования (они обрабатываются отдельно)
+                if (btn.classList.contains('paint-tool-btn')) return;
+
+                // ИСПРАВЛЕНО: Инструменты работают в обоих режимах
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                moleculeTool = btn.id.replace('tool-', '');
+                currentTool = ''; // Сбрасываем инструмент рисования
+
+                // Сбрасываем все состояния при смене инструмента
+                selectedMoleculeUI = null;
+                isDraggingMolecule = false;
+
+                canvas.style.cursor = getCursorForTool(moleculeTool);
+                status.textContent = `Инструмент: ${getToolName(moleculeTool)}`;
+            });
+        });
+
+        // Курсор для каждого инструмента
+        function getCursorForTool(tool) {
+            // Кастомные курсоры с иконками инструментов
+            // Формат: url(путь) hotspot-x hotspot-y, fallback
+            switch(tool) {
+                case 'select': return 'url(icons/select.png) 12 12, default';
+                case 'create': return 'url(icons/create.png) 12 12, crosshair';
+                case 'delete': return 'url(icons/delete.png) 12 12, not-allowed';
+                default: return 'default';
+            }
+        }
+
+        // Название инструмента
+        function getToolName(tool) {
+            switch(tool) {
+                case 'select': return 'Выбор (мышь=перемещение, Ctrl=размер, Shift=растяжение, Alt=вращение, колёсико=размер)';
+                case 'create': return 'Создание молекул';
+                case 'delete': return 'Удаление молекул';
+                default: return 'Неизвестный инструмент';
+            }
+        }
+
+        // Фиксация выбранной молекулы
+        document.getElementById('action-lock').addEventListener('click', () => {
+            if (selectedMoleculeUI) {
+                selectedMoleculeUI.lock();
+                saveState();
+                status.textContent = '🔒 Молекула зафиксирована';
+            } else {
+                status.textContent = '⚠️ Сначала выберите молекулу инструментом "Выбор"';
+            }
+        });
+
+        // Разблокировка выбранной молекулы
+        document.getElementById('action-unlock').addEventListener('click', () => {
+            if (selectedMoleculeUI) {
+                selectedMoleculeUI.unlock();
+                saveState();
+                status.textContent = '🔓 Молекула разблокирована';
+            } else {
+                status.textContent = '⚠️ Сначала выберите молекулу инструментом "Выбор"';
+            }
+        });
+
         // Автоматическое скрытие подсказок на мобильных (сразу при загрузке)
         if (isMobile) {
             gestureHint.classList.add('minimized');
@@ -5284,7 +5804,9 @@
                             // Создаём молекулу в центре экрана
                             const centerX = width / 2;
                             const centerY = height / 2;
-                            molecules.push(new Molecule(centerX, centerY, currentMolSize));
+                            const newMol = new Molecule(centerX, centerY, currentMolSize);
+                            newMol.shapes = [{type: selectedShape, weight: 1}];
+                            molecules.push(newMol);
                             saveState(); // Сохраняем состояние для отмены
                         }
 
@@ -5359,7 +5881,14 @@
                 modeIndicator.textContent = '🎨 Режим редактора';
                 modeIndicator.className = 'mode-indicator editor-mode active';
 
-                paintToolbar.classList.add('active');
+                // УСТАРЕЛО: paintToolbar теперь часть #toolbox
+                // paintToolbar.classList.add('active');
+
+                // ИСПРАВЛЕНО: Панель инструментов доступна в обоих режимах
+                // toolbox остается видимой
+
+                // Показываем инструменты рисования в режиме редактора
+                document.getElementById('paintToolsSection').style.display = 'block';
 
                 // На мобильных показываем кнопку палитры, на десктопе открываем панель сразу
                 if (isMobile) {
@@ -5382,18 +5911,8 @@
                 // Скрываем чекбокс отладки жестов в режиме редактора
                 gestureDebugCheckbox.style.display = 'none';
 
-                // Замораживаем текущее состояние молекул
-                frozenMolecules = molecules.map(mol => ({
-                    x: mol.x,
-                    y: mol.y,
-                    size: mol.size,
-                    stretchX: mol.stretchX,
-                    stretchY: mol.stretchY,
-                    deformAngle: mol.deformAngle,
-                    fillColor: mol.fillColor || null, // Сохраняем цвет заливки внутренности
-                    edgeColor: mol.edgeColor || null, // Сохраняем цвет заливки контура
-                    emboss: mol.emboss || false       // Сохраняем эффект тиснения
-                }));
+                // ИСПРАВЛЕНО: Не замораживаем молекулы, они остаются "живыми"
+                // Цвета и эффекты применяются напрямую к молекулам
 
                 status.textContent = `Режим редактора | Молекул: ${molecules.length}`;
             } else {
@@ -5403,7 +5922,14 @@
                 modeIndicator.textContent = '👋 Режим жестов';
                 modeIndicator.className = 'mode-indicator gesture-mode active';
 
-                paintToolbar.classList.remove('active');
+                // УСТАРЕЛО: paintToolbar теперь часть #toolbox
+                // paintToolbar.classList.remove('active');
+
+                // ИСПРАВЛЕНО: Панель инструментов всегда видима
+                // Не нужно показывать/скрывать
+
+                // Скрываем инструменты рисования в режиме жестов
+                document.getElementById('paintToolsSection').style.display = 'none';
 
                 // Скрываем палитру и кнопку палитры
                 if (isMobile) {
@@ -5421,14 +5947,8 @@
 
                 selectedMolecule = null;
 
-                // Применяем изменённые цвета и эффекты обратно к молекулам
-                frozenMolecules.forEach((frozen, i) => {
-                    if (molecules[i]) {
-                        molecules[i].fillColor = frozen.fillColor;
-                        molecules[i].edgeColor = frozen.edgeColor;
-                        molecules[i].emboss = frozen.emboss;
-                    }
-                });
+                // ИСПРАВЛЕНО: Цвета и эффекты уже применены напрямую к молекулам
+                // Не нужно восстанавливать из frozenMolecules
 
                 status.textContent = 'Режим жестов | Готов';
             }
@@ -5474,16 +5994,49 @@
         }
 
         // Обработчики для кнопок инструментов (поддержка клика и тача)
+        // УСТАРЕЛО: Старые кнопки .paint-tool теперь скрыты
         document.querySelectorAll('.paint-tool').forEach(tool => {
-            // Click для десктопа
             tool.addEventListener('click', () => {
                 selectTool(tool);
             });
-
-            // Touch для мобильных устройств
             tool.addEventListener('touchend', (e) => {
-                e.preventDefault(); // Предотвращаем двойное срабатывание
+                e.preventDefault();
                 selectTool(tool);
+            });
+        });
+
+        // НОВЫЕ: Обработчики для кнопок рисования в объединённой панели
+        document.querySelectorAll('.paint-tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Снимаем выделение со всех инструментов
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                // Выделяем эту кнопку
+                btn.classList.add('active');
+                // Устанавливаем текущий инструмент
+                currentTool = btn.dataset.tool;
+                moleculeTool = ''; // Сбрасываем инструмент молекул
+
+                // Обновляем интерфейс в зависимости от инструмента
+                const fillModeLabel = document.getElementById('fillModeLabel');
+                const pencilToolLabel = document.getElementById('pencilToolLabel');
+                const smartEraserCheckbox = document.getElementById('smartEraserCheckbox');
+
+                if (currentTool === 'fill') {
+                    fillModeLabel.style.display = 'block';
+                    pencilToolLabel.style.display = 'none';
+                    smartEraserCheckbox.style.display = 'none';
+                    status.textContent = `Инструмент: Заливка (${fillMode})`;
+                } else if (currentTool === 'pencil') {
+                    fillModeLabel.style.display = 'none';
+                    pencilToolLabel.style.display = 'block';
+                    smartEraserCheckbox.style.display = 'none';
+                    status.textContent = 'Инструмент: Карандаш';
+                } else if (currentTool === 'eraser') {
+                    fillModeLabel.style.display = 'none';
+                    pencilToolLabel.style.display = 'none';
+                    smartEraserCheckbox.style.display = 'block';
+                    status.textContent = smartEraserMode ? 'Инструмент: Умный ластик' : 'Инструмент: Ластик';
+                }
             });
         });
 
@@ -5677,17 +6230,21 @@
                 }
             }
 
-            // Меняем курсор
-            if (currentTool === 'fill' || currentTool === 'eraser') {
-                canvas.style.cursor = hoveredMoleculeEditor ? 'pointer' : 'crosshair';
+            // Меняем курсор на кастомные иконки
+            if (currentTool === 'fill') {
+                canvas.style.cursor = hoveredMoleculeEditor ? 'pointer' : 'url(icons/fill.png) 12 12, crosshair';
             } else if (currentTool === 'pencil') {
-                canvas.style.cursor = 'crosshair';
+                canvas.style.cursor = 'url(icons/pencil.png) 46 2, crosshair';
+            } else if (currentTool === 'eraser') {
+                canvas.style.cursor = hoveredMoleculeEditor ? 'pointer' : 'url(icons/eraser.png) 12 12, crosshair';
             }
         });
 
         // Клик на canvas в режиме редактора
         canvas.addEventListener('click', (e) => {
             if (!editorMode) return;
+            // Работает только если НЕ выбран инструмент молекул
+            if (moleculeTool) return;
 
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
@@ -5987,15 +6544,81 @@
 
         // Обработчики мыши для карандаша и ластика
         canvas.addEventListener('mousedown', (e) => {
-            if (!editorMode) return;
-            if (currentTool !== 'pencil' && currentTool !== 'eraser') return;
-
-            isDrawing = true;
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
+
+            // === ИНСТРУМЕНТЫ ДЛЯ МОЛЕКУЛ (работают в ОБОИХ режимах) ===
+            // Работают только если НЕ выбран инструмент рисования
+            if (moleculeTool && !currentTool && ['select', 'create', 'delete'].includes(moleculeTool)) {
+
+                if (moleculeTool === 'select') {
+                    // Выбираем молекулу под курсором
+                    selectedMoleculeUI = null;
+
+                    for (let i = molecules.length - 1; i >= 0; i--) {
+                        const mol = molecules[i];
+                        const dx = x - mol.x;
+                        const dy = y - mol.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist < mol.size * 1.5) {
+                            selectedMoleculeUI = mol;
+                            isDraggingMolecule = true;
+                            // Сохраняем все начальные значения для возможного редактирования
+                            dragOffsetX = dx;
+                            dragOffsetY = dy;
+                            editStartX = x;
+                            editStartY = y;
+                            editStartRadius = mol.size;
+                            editStartStretchX = mol.stretchX;
+                            editStartStretchY = mol.stretchY;
+                            editStartAngle = mol.deformAngle;
+                            status.textContent = '✅ Молекула выбрана (мышь=перемещение, Ctrl=размер, Shift=растяжение, Alt=вращение)';
+                            break;
+                        }
+                    }
+                    if (!selectedMoleculeUI) {
+                        status.textContent = 'Кликните на молекулу чтобы выбрать';
+                    }
+                } else if (moleculeTool === 'create') {
+                    // Создаем новую молекулу с размером из панели параметров
+                    const size = config.moleculeSize / 2; // Преобразуем размер в size для Molecule
+                    const newMol = new Molecule(x, y, size);
+                    newMol.shapes = [{type: selectedShape, weight: 1}];
+                    newMol.vx = (Math.random() - 0.5) * 2;
+                    newMol.vy = (Math.random() - 0.5) * 2;
+                    molecules.push(newMol);
+                    saveState();
+                    status.textContent = `✨ Создана молекула (форма: ${selectedShape}, размер: ${config.moleculeSize})`;
+                } else if (moleculeTool === 'delete') {
+                    // Удаляем молекулу под курсором
+                    for (let i = molecules.length - 1; i >= 0; i--) {
+                        const mol = molecules[i];
+                        const dx = x - mol.x;
+                        const dy = y - mol.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist < mol.size * 1.5) {
+                            molecules.splice(i, 1);
+                            selectedMoleculeUI = null;
+                            saveState();
+                            status.textContent = '🗑️ Молекула удалена';
+                            return;
+                        }
+                    }
+                    status.textContent = 'Кликните на молекулу чтобы удалить';
+                }
+                return;
+            }
+
+            // === ИНСТРУМЕНТЫ РЕДАКТОРА (карандаш, ластик) ===
+            if (!editorMode) return;
+            if (currentTool !== 'pencil' && currentTool !== 'eraser') return;
+
+            isDrawing = true;
 
             if (currentTool === 'pencil') {
                 // Начинаем новый штрих
@@ -6076,88 +6699,113 @@
                         status.textContent = 'Нечего удалять (кликните на контур или заливку)';
                     }
                 } else {
-                    // ОБЫЧНЫЙ ЛАСТИК: стирает частями при движении
-                    const eraserSize = pencilWidth * 2; // Ластик в 2 раза больше карандаша
-
-                    // Стираем штрихи под ластиком (если режим edge или both)
-                    if (fillMode === 'edge' || fillMode === 'both') {
-                        drawnStrokes = drawnStrokes.filter(stroke => {
-                            // Проверяем каждую точку штриха
-                            for (const point of stroke.points) {
-                                const dist = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
-                                if (dist < eraserSize) {
-                                    return false; // Удаляем этот штрих
-                                }
-                            }
-                            return true;
-                        });
-                    }
-
-                    // Стираем залитые области (если режим interior или both)
-                    if (fillMode === 'interior' || fillMode === 'both') {
-                        for (const region of filledRegions) {
-                            if (x >= region.x && x < region.x + region.width &&
-                                y >= region.y && y < region.y + region.height) {
-                                // Стираем круг в imageData
-                                const pixels = region.imageData.data;
-                                for (let dy = -eraserSize; dy <= eraserSize; dy++) {
-                                    for (let dx = -eraserSize; dx <= eraserSize; dx++) {
-                                        const dist = Math.sqrt(dx * dx + dy * dy);
-                                        if (dist <= eraserSize) {
-                                            const px = Math.floor(x - region.x + dx);
-                                            const py = Math.floor(y - region.y + dy);
-                                            if (px >= 0 && px < region.width && py >= 0 && py < region.height) {
-                                                const idx = (py * region.width + px) * 4;
-                                                pixels[idx + 3] = 0; // Делаем прозрачным
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    // ОБЫЧНЫЙ ЛАСТИК: работает при движении мыши (в mousemove)
+                    // Здесь ничего не делаем, только начинаем isDrawing
                 }
             }
         });
 
         canvas.addEventListener('mousemove', (e) => {
-            if (!editorMode) return;
-            if (currentTool !== 'pencil' && currentTool !== 'eraser') return;
-            if (!isDrawing) return;
-
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
 
+            // Сохраняем позицию мыши для вставки
+            lastMouseX = x;
+            lastMouseY = y;
+
+            // === ПЕРЕМЕЩЕНИЕ И РЕДАКТИРОВАНИЕ МОЛЕКУЛ (работают в ОБОИХ режимах) ===
+            // Работают только если НЕ выбран инструмент рисования
+            if (!currentTool && isDraggingMolecule && selectedMoleculeUI) {
+                // Проверяем зажатые клавиши-модификаторы для определения режима
+                if (e.ctrlKey) {
+                    // Ctrl: вертикальное движение = размер
+                    const deltaY = editStartY - y; // Вверх = увеличение, вниз = уменьшение
+                    const newSize = Math.max(15, Math.min(200, editStartRadius + deltaY * 0.5));
+                    selectedMoleculeUI.size = newSize;
+                    selectedMoleculeUI.targetSize = newSize;
+                    selectedMoleculeUI.baseSize = newSize;
+                    status.textContent = `📏 Размер: ${Math.round(newSize)}px (Ctrl+мышь вверх/вниз)`;
+                } else if (e.altKey) {
+                    // Alt: горизонтальное движение = вращение
+                    const deltaX = (x - editStartX) * 0.01;
+                    selectedMoleculeUI.deformAngle = (editStartAngle + deltaX) % (Math.PI * 2);
+                    const degrees = (selectedMoleculeUI.deformAngle * 180 / Math.PI).toFixed(0);
+                    status.textContent = `🔄 Вращение: ${degrees}° (Alt+мышь влево/вправо)`;
+                } else if (e.shiftKey) {
+                    // Shift: свободное растяжение по обеим осям
+                    const deltaX = (x - editStartX) * 0.01;
+                    const deltaY = -(y - editStartY) * 0.01;
+                    const newStretchX = Math.max(0.2, Math.min(5.0, editStartStretchX + deltaX));
+                    const newStretchY = Math.max(0.2, Math.min(5.0, editStartStretchY + deltaY));
+                    selectedMoleculeUI.stretchX = newStretchX;
+                    selectedMoleculeUI.stretchY = newStretchY;
+                    status.textContent = `↔️↕️ Растяжение X: ${newStretchX.toFixed(2)}, Y: ${newStretchY.toFixed(2)} (Shift+мышь)`;
+                } else {
+                    // Без модификаторов: перемещение
+                    selectedMoleculeUI.x = x - dragOffsetX;
+                    selectedMoleculeUI.y = y - dragOffsetY;
+                    selectedMoleculeUI.targetX = selectedMoleculeUI.x;
+                    selectedMoleculeUI.targetY = selectedMoleculeUI.y;
+                    status.textContent = `📍 Перемещение (Ctrl=размер, Shift=растяжение, Alt=вращение)`;
+                }
+                return;
+            }
+
+            // === КАРАНДАШ И ЛАСТИК ===
+            if (!editorMode) return;
+            if (currentTool !== 'pencil' && currentTool !== 'eraser') return;
+            if (!isDrawing) return;
+
             if (currentTool === 'pencil') {
                 // Добавляем точку к текущему штриху
                 currentStroke.points.push({x, y});
             } else if (currentTool === 'eraser' && !smartEraserMode) {
-                // Обычный ластик работает при движении (умный работает только по клику)
-                const eraserSize = pencilWidth * 2;
+                // ОБЫЧНЫЙ ЛАСТИК: стирает постепенно в области курсора (как заливку)
+                const eraserSize = pencilWidth * 8; // Увеличили с *2 до *8 для удобства
+                let erasedCount = 0;
 
                 // Стираем штрихи под ластиком (если режим edge или both)
                 if (fillMode === 'edge' || fillMode === 'both') {
-                    drawnStrokes = drawnStrokes.filter(stroke => {
+                    // Помечаем точки штрихов как стертые, если они попадают под ластик
+                    for (const stroke of drawnStrokes) {
                         for (let i = 0; i < stroke.points.length; i++) {
                             const point = stroke.points[i];
+
+                            // Пропускаем уже стертые точки
+                            if (point.erased) continue;
+
+                            // Проверяем расстояние от точки до центра ластика
                             const dist = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
+
                             if (dist < eraserSize) {
-                                return false;
+                                // Помечаем точку как стертую
+                                point.erased = true;
+                                erasedCount++;
                             }
-                            // Проверяем также пересечение с линией между точками
+
+                            // Также проверяем линию между текущей и предыдущей точкой
                             if (i > 0) {
                                 const prevPoint = stroke.points[i - 1];
-                                const lineDist = distanceToLineSegment(x, y, prevPoint.x, prevPoint.y, point.x, point.y);
-                                if (lineDist < eraserSize) {
-                                    return false;
+                                if (!prevPoint.erased) {
+                                    const lineDist = distanceToLineSegment(x, y, prevPoint.x, prevPoint.y, point.x, point.y);
+
+                                    if (lineDist < eraserSize) {
+                                        // Стираем обе точки линии
+                                        point.erased = true;
+                                        prevPoint.erased = true;
+                                        erasedCount += 2;
+                                    }
                                 }
                             }
                         }
-                        return true;
-                    });
+                    }
+                }
+
+                if (erasedCount > 0) {
+                    status.textContent = `🧹 Стирание контура (точек стерто: ${erasedCount})`;
                 }
 
                 // Стираем залитые области (если режим interior или both)
@@ -6213,6 +6861,16 @@
 
         // Локальный обработчик mouseup на canvas
         canvas.addEventListener('mouseup', () => {
+            // === ЗАВЕРШЕНИЕ ОПЕРАЦИЙ С МОЛЕКУЛАМИ ===
+            // Работают только если НЕ выбран инструмент рисования
+            if (!currentTool && isDraggingMolecule && selectedMoleculeUI) {
+                isDraggingMolecule = false;
+                saveState();
+                status.textContent = '✅ Операция завершена';
+                return;
+            }
+
+            // === КАРАНДАШ И ЛАСТИК ===
             if (!editorMode) return;
             if (currentTool !== 'pencil' && currentTool !== 'eraser') return;
             if (!isDrawing) return;
@@ -6235,6 +6893,16 @@
 
         // Глобальный обработчик mouseup - на случай если кнопка отпущена вне canvas
         document.addEventListener('mouseup', () => {
+            // === ЗАВЕРШЕНИЕ ОПЕРАЦИЙ С МОЛЕКУЛАМИ (глобально) ===
+            // Работают только если НЕ выбран инструмент рисования
+            if (!currentTool && isDraggingMolecule) {
+                isDraggingMolecule = false;
+                saveState();
+                status.textContent = '✅ Операция завершена';
+                return;
+            }
+
+            // === КАРАНДАШ И ЛАСТИК ===
             if (!editorMode) return;
             if (currentTool !== 'pencil' && currentTool !== 'eraser') return;
             if (!isDrawing) return;
@@ -6255,6 +6923,24 @@
             }
         });
 
+        // === ОБРАБОТЧИК КОЛЁСИКА МЫШИ ДЛЯ ИЗМЕНЕНИЯ РАЗМЕРА ===
+        canvas.addEventListener('wheel', (e) => {
+            // Работает только если выбрана молекула и активен инструмент select
+            if (!currentTool && moleculeTool === 'select' && selectedMoleculeUI) {
+                e.preventDefault(); // Предотвращаем прокрутку страницы
+
+                // Определяем направление прокрутки (вверх = увеличение, вниз = уменьшение)
+                const delta = -Math.sign(e.deltaY) * 5; // Шаг изменения размера
+                const newSize = Math.max(15, Math.min(200, selectedMoleculeUI.size + delta));
+
+                selectedMoleculeUI.size = newSize;
+                selectedMoleculeUI.targetSize = newSize;
+                selectedMoleculeUI.baseSize = newSize;
+
+                status.textContent = `📏 Размер: ${Math.round(newSize)}px (колёсико мыши)`;
+            }
+        }, { passive: false }); // passive: false чтобы preventDefault работал
+
         // === ОБРАБОТЧИК КЛАВИАТУРЫ ДЛЯ ОТМЕНЫ ДЕЙСТВИЙ ===
         document.addEventListener('keydown', (e) => {
             // Ctrl+Z или Cmd+Z (для Mac) - используем e.code для работы на любой раскладке
@@ -6262,6 +6948,85 @@
                 console.log(`⌨️ Нажата комбинация Ctrl+Z (раскладка: ${e.key})`);
                 e.preventDefault(); // Предотвращаем стандартное поведение браузера
                 undo();
+            }
+
+            // Ctrl+C или Cmd+C - копирование выбранной молекулы
+            if ((e.ctrlKey || e.metaKey) && e.code === 'KeyC' && !editorMode) {
+                if (selectedMoleculeUI) {
+                    e.preventDefault();
+                    // Копируем все свойства молекулы
+                    copiedMolecule = {
+                        size: selectedMoleculeUI.size,
+                        baseSize: selectedMoleculeUI.baseSize,
+                        targetSize: selectedMoleculeUI.targetSize,
+                        stretchX: selectedMoleculeUI.stretchX,
+                        stretchY: selectedMoleculeUI.stretchY,
+                        deformAngle: selectedMoleculeUI.deformAngle,
+                        shapes: JSON.parse(JSON.stringify(selectedMoleculeUI.shapes)), // Глубокая копия
+                        fillColor: selectedMoleculeUI.fillColor,
+                        edgeColor: selectedMoleculeUI.edgeColor,
+                        emboss: selectedMoleculeUI.emboss,
+                        isLocked: false, // Новая молекула не должна быть заблокирована
+                        isShapeLocked: false
+                    };
+                    status.textContent = '📋 Молекула скопирована (Ctrl+V для вставки)';
+                } else {
+                    status.textContent = '⚠️ Выберите молекулу для копирования';
+                }
+            }
+
+            // Ctrl+V или Cmd+V - вставка молекулы
+            if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV' && !editorMode) {
+                if (copiedMolecule) {
+                    e.preventDefault();
+                    // Создаем новую молекулу с копией свойств
+                    const pasteX = lastMouseX || width / 2;
+                    const pasteY = lastMouseY || height / 2;
+
+                    const newMol = new Molecule(pasteX, pasteY, copiedMolecule.size);
+
+                    // Копируем все свойства
+                    newMol.baseSize = copiedMolecule.baseSize;
+                    newMol.targetSize = copiedMolecule.targetSize;
+                    newMol.stretchX = copiedMolecule.stretchX;
+                    newMol.stretchY = copiedMolecule.stretchY;
+                    newMol.deformAngle = copiedMolecule.deformAngle;
+                    newMol.shapes = JSON.parse(JSON.stringify(copiedMolecule.shapes)); // Глубокая копия
+                    newMol.fillColor = copiedMolecule.fillColor;
+                    newMol.edgeColor = copiedMolecule.edgeColor;
+                    newMol.emboss = copiedMolecule.emboss;
+                    newMol.isLocked = copiedMolecule.isLocked;
+                    newMol.isShapeLocked = copiedMolecule.isShapeLocked;
+
+                    // Небольшая начальная скорость
+                    newMol.vx = (Math.random() - 0.5) * 2;
+                    newMol.vy = (Math.random() - 0.5) * 2;
+
+                    molecules.push(newMol);
+                    saveState();
+
+                    // Выбираем вставленную молекулу
+                    selectedMoleculeUI = newMol;
+                    status.textContent = `📌 Молекула вставлена (x: ${Math.round(pasteX)}, y: ${Math.round(pasteY)})`;
+                } else {
+                    status.textContent = '⚠️ Сначала скопируйте молекулу (Ctrl+C)';
+                }
+            }
+
+            // Delete - удаление выбранной молекулы
+            if (e.code === 'Delete' && !editorMode) {
+                if (selectedMoleculeUI) {
+                    e.preventDefault();
+                    const index = molecules.indexOf(selectedMoleculeUI);
+                    if (index !== -1) {
+                        molecules.splice(index, 1);
+                        selectedMoleculeUI = null;
+                        saveState();
+                        status.textContent = '🗑️ Молекула удалена (Delete)';
+                    }
+                } else {
+                    status.textContent = '⚠️ Выберите молекулу для удаления';
+                }
             }
         });
 
@@ -6523,6 +7288,7 @@
                         if (!virtualMode || virtualMode === 'create') {
                             clearTimeout(longPressTimer);
                             const newMol = new Molecule(x, y, config.moleculeSize);
+                            newMol.shapes = [{type: selectedShape, weight: 1}];
                             molecules.push(newMol);
                             touchedMolecule = newMol;
                             status.textContent = `✨ Молекула создана | ${molecules.length}/${maxMolecules}`;

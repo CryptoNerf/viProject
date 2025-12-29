@@ -1,0 +1,9 @@
+@font-face {
+    font-family: 'Sysfont C';
+    src: url('SysfontC.woff2') format('woff2'),
+        url('SysfontC.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+

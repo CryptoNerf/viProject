@@ -1,0 +1,321 @@
+@font-face {
+    font-family: 'SysfontC';
+    src: url('../SysfontC.woff2') format('woff2'),
+         url('../SysfontC.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+/* Центрирование книги */
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #cccccc;
+}
+
+.flipbook-container {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.book-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+/* Плавное центрирование обложек */
+#book .stf__wrapper {
+    transition: transform 0.4s ease-out;
+}
+
+
+/* Кнопка назад */
+.back-button {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: #ffffff;
+    border: 2px solid #000000;
+    font-family: 'SysfontC', Arial, monospace;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 #000000;
+    z-index: 1000;
+    transition: all 0.2s;
+}
+
+.back-button:hover {
+    background: #dddddd;
+}
+
+.back-button:active {
+    box-shadow: none;
+    transform: translate(2px, 2px);
+}
+
+/* Базовая страница manual */
+.page {
+    background: #ffffff;
+    color: #000000;
+    font-family: 'SysfontC', monospace;
+}
+
+.page-inner {
+    width: 100%;
+    height: 100%;
+    padding: 30px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    border: 3px solid #000000;
+    overflow: hidden;
+}
+
+.page-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* Обложки */
+.page-cover {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: #000000;
+    color: #ffffff;
+}
+
+.page-cover .page-inner {
+    border: 3px solid #ffffff;
+    justify-content: center;
+}
+
+.page-cover h1 {
+    font-size: 48px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 20px;
+    border-bottom: 4px solid #ffffff;
+    padding-bottom: 20px;
+}
+
+.page-cover .subtitle {
+    font-size: 24px;
+    text-transform: uppercase;
+    margin: 20px 0;
+}
+
+.page-cover .author {
+    font-size: 20px;
+    text-transform: uppercase;
+    margin-top: 20px;
+}
+
+.cover-image {
+    max-width: 200px;
+    max-height: 400px;
+    margin: 30px auto 0;
+    object-fit: contain;
+    display: block;
+}
+
+/* Задняя обложка */
+.page-cover-back {
+    background: #000000;
+    color: #ffffff;
+}
+
+.page-cover-back h1 {
+    font-size: 36px;
+}
+
+.page-cover-back .subtitle {
+    margin-top: 20px;
+    font-size: 18px;
+}
+
+/* Внутренние страницы */
+.page h2 {
+    font-size: 20px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #000000;
+    flex-shrink: 0;
+}
+
+.gesture-description {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+}
+
+.gesture-description strong {
+    display: block;
+    margin-bottom: 3px;
+}
+
+.gesture-function {
+    font-size: 14px;
+    font-weight: bold;
+    margin: 8px 0;
+    padding: 10px;
+    background: #f0f0f0;
+    border: 2px solid #000000;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.gesture-image {
+    flex: 1;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f9f9f9;
+    border: 2px solid #000000;
+    min-height: 150px;
+    max-height: 100%;
+    color: #999999;
+    font-size: 12px;
+    padding: 8px;
+    overflow: hidden;
+}
+
+.gesture-image img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .page-inner {
+        padding: 20px;
+    }
+
+    .page-cover h1 {
+        font-size: 28px;
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+    }
+
+    .page-cover .subtitle {
+        font-size: 16px;
+        margin: 12px 0;
+    }
+
+    .page-cover .author {
+        font-size: 14px;
+        margin-top: 12px;
+    }
+
+    .cover-image {
+        max-width: 150px;
+        max-height: 150px;
+        margin: 20px auto 0;
+    }
+
+    .page h2 {
+        font-size: 16px;
+        margin-bottom: 10px;
+        padding-bottom: 6px;
+    }
+
+    .gesture-description {
+        font-size: 12px;
+        line-height: 1.5;
+        margin-bottom: 8px;
+    }
+
+    .gesture-function {
+        font-size: 12px;
+        padding: 8px;
+        margin: 6px 0;
+    }
+
+    .gesture-image {
+        min-height: 120px;
+        margin-top: 8px;
+        padding: 6px;
+    }
+}
+
+@media (max-width: 500px) {
+    .page-inner {
+        padding: 15px;
+    }
+
+    .page-cover h1 {
+        font-size: 22px;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+        border-bottom-width: 3px;
+    }
+
+    .page-cover .subtitle {
+        font-size: 14px;
+        margin: 10px 0;
+    }
+
+    .page-cover .author {
+        font-size: 12px;
+        margin-top: 10px;
+    }
+
+    .cover-image {
+        max-width: 120px;
+        max-height: 120px;
+        margin: 15px auto 0;
+    }
+
+    .page-cover-back h1 {
+        font-size: 22px;
+    }
+
+    .page-cover-back .subtitle {
+        font-size: 12px;
+    }
+
+    .page h2 {
+        font-size: 14px;
+        margin-bottom: 8px;
+        padding-bottom: 5px;
+    }
+
+    .gesture-description {
+        font-size: 11px;
+        line-height: 1.4;
+        margin-bottom: 6px;
+    }
+
+    .gesture-function {
+        font-size: 11px;
+        padding: 6px;
+        margin: 5px 0;
+    }
+
+    .gesture-image {
+        min-height: 80px;
+        font-size: 10px;
+        margin-top: 6px;
+        padding: 5px;
+    }
+}

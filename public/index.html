@@ -518,6 +518,8 @@
         #toggleHints {
             top: 20px;
             left: 20px;
+            opacity: 1;
+            pointer-events: auto;
         }
 
         #toggleControls {
@@ -1290,27 +1292,7 @@
         <video id="videoElement" autoplay playsinline></video>
         <canvas id="canvas"></canvas>
 
-        <div class="gesture-hint" id="gestureHint">
-            <button class="close-panel" id="closeHints" title="Hide hints">×</button>
-            <strong>Gestures:</strong>
-            <div>Pinch 1sec → create molecule</div>
-            <div>Open mouth → mode ✎</div>
-            <div>Palm → move molecule</div>
-            <div>Palm (in ✎ mode) → size & shape</div>
-            <div style="font-size: 14px; margin-left: 10px;">↳ palm width = size</div>
-            <div style="font-size: 14px; margin-left: 10px;">↳ bent fingers = shape</div>
-            <div>All fingers together 1sec → lock molecule</div>
-            <div>Both hands (fingers together) 1sec → lock ALL</div>
-            <div>Pinky finger → unlock</div>
-            <div>Crossed fingers 1sec → delete</div>
-            <div>Sound → contour deformation</div>
-            <strong style="margin-top: 8px; display: block;">Keyboard:</strong>
-            <div>Ctrl+C → copy molecule</div>
-            <div>Ctrl+V → paste molecule</div>
-            <div>Ctrl+Z → undo action</div>
-        </div>
-
-        <div class="toggle-btn" id="toggleHints" title="Show hints">?</div>
+        <div class="toggle-btn" id="toggleHints" title="Open manual book">?</div>
 
         <!-- Toolbox -->
         <div id="toolbox">
@@ -5738,23 +5720,14 @@
         });
 
         // UI сворачивание/разворачивание панелей
-        const gestureHint = document.getElementById('gestureHint');
         const controlsPanel = document.getElementById('controls');
         const toggleHintsBtn = document.getElementById('toggleHints');
         const toggleControlsBtn = document.getElementById('toggleControls');
-        const closeHintsBtn = document.getElementById('closeHints');
         const closeControlsBtn = document.getElementById('closeControls');
 
-        // Скрыть подсказки
-        closeHintsBtn.addEventListener('click', () => {
-            gestureHint.classList.add('minimized');
-            toggleHintsBtn.classList.add('visible');
-        });
-
-        // Показать подсказки
+        // Открыть книгу с мануалом
         toggleHintsBtn.addEventListener('click', () => {
-            gestureHint.classList.remove('minimized');
-            toggleHintsBtn.classList.remove('visible');
+            window.open('manual.html', '_blank');
         });
 
         // Скрыть панель управления
@@ -5843,12 +5816,6 @@
                 status.textContent = 'First select molecule with Select tool';
             }
         });
-
-        // Автоматическое скрытие подсказок на мобильных (сразу при загрузке)
-        if (isMobile) {
-            gestureHint.classList.add('minimized');
-            toggleHintsBtn.classList.add('visible');
-        }
 
         // === МОБИЛЬНАЯ АДАПТАЦИЯ ПАНЕЛЕЙ ===
         const colorPalette = document.getElementById('colorPalette');
@@ -6046,7 +6013,6 @@
             const paintToolbar = document.getElementById('paintToolbar');
             // colorPalette уже определена глобально, используем её
             const controlsPanel = document.getElementById('controls');
-            const gestureHint = document.getElementById('gestureHint');
             const gestureDebugCheckbox = document.getElementById('gestureDebugCheckbox');
 
             if (editorMode) {
@@ -6079,9 +6045,6 @@
                 } else {
                     colorPalette.classList.add('active');
                 }
-
-                // Скрываем только подсказки жестов, панель controls оставляем
-                gestureHint.classList.add('minimized');
 
                 // Скрываем чекбокс отладки жестов в режиме редактора
                 gestureDebugCheckbox.style.display = 'none';

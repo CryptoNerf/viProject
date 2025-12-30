@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manual Book - Gesture Guide</title>
+
+  <link rel="stylesheet" href="css/manual.css" />
+</head>
+<body>
+  <div class="flipbook-container">
+    <!-- Кнопка назад -->
+    <button class="back-button" onclick="window.location.href='index.html'">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Back
+    </button>
+
+    <!-- Книга -->
+    <div class="book-wrapper">
+      <div id="book"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+  <script src="js/manual-flip.js"></script>
+</body>
+</html>

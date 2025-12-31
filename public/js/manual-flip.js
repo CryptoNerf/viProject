@@ -72,7 +72,7 @@ const translations = {
       },
       keyboard: {
         title: 'KEYBOARD SHORTCUTS',
-        html: '<div style="font-size: 18px; line-height: 2;"><strong>Ctrl+C</strong> → Copy selected molecule<br><strong>Ctrl+V</strong> → Paste copied molecule<br><strong>Ctrl+Z</strong> → Undo last action<br><strong>Delete</strong> → Delete selected molecule</div>',
+        html: '<div style="font-size: 20px; line-height: 2;"><strong>Ctrl+C</strong> → Copy selected molecule<br><strong>Ctrl+V</strong> → Paste copied molecule<br><strong>Ctrl+Z</strong> → Undo last action<br><strong>Delete</strong> → Delete selected molecule</div>',
         func: 'Quick actions using keyboard'
       }
     },
@@ -82,7 +82,7 @@ const translations = {
     },
     finalPage: {
       title: 'THAT\'S ALL!',
-      text: 'Welp, I guess that\'s it. Thank you dear user for your interest in the project. I hope it helps you create something beautiful or captures your attention.<br><br>If you\'re curious about what else I do, you can visit my website <a href="https://cryptonerf.github.io/portfolio/" target="_blank">cryptonerf.github.io/portfolio</a> where I collect my works.<br><br>Or my telegram channel <a href="https://t.me/solnechnoederevo" target="_blank">t.me/solnechnoederevo</a> where I share my life even more often!'
+      text: 'Welp, I guess that\'s it. Thank you dear user for your interest in the project. I hope it helps you create something beautiful or captures your attention.<br>If you\'re curious about what else I do, you can visit my website <a href="https://cryptonerf.github.io/portfolio/" target="_blank">cryptonerf.github.io/portfolio</a> where I collect my works.<br>Or my telegram channel <a href="https://t.me/solnechnoederevo" target="_blank">t.me/solnechnoederevo</a> where I share my life even more often!'
     }
   },
   ru: {
@@ -152,7 +152,7 @@ const translations = {
       },
       keyboard: {
         title: 'КЛАВИАТУРНЫЕ СОКРАЩЕНИЯ',
-        html: '<div style="font-size: 18px; line-height: 2;"><strong>Ctrl+C</strong> → Копировать выбранную молекулу<br><strong>Ctrl+V</strong> → Вставить скопированную молекулу<br><strong>Ctrl+Z</strong> → Отменить последнее действие<br><strong>Delete</strong> → Удалить выбранную молекулу</div>',
+        html: '<div style="font-size: 20px; line-height: 2;"><strong>Ctrl+C</strong> → Копировать выбранную молекулу<br><strong>Ctrl+V</strong> → Вставить скопированную молекулу<br><strong>Ctrl+Z</strong> → Отменить последнее действие<br><strong>Delete</strong> → Удалить выбранную молекулу</div>',
         func: 'Быстрые действия с помощью клавиатуры'
       }
     },
@@ -162,7 +162,7 @@ const translations = {
     },
     finalPage: {
       title: 'НУ ВОТ И ВСЁ!',
-      text: 'Ээээ ну вроде всё. Спасибо тебе дорогой пользователь за интерес к проекту. Надеюсь он поможет тебе сделать что-то красивое или увлечёт тебя.<br><br>Если тебе стало интересно узнать что ещё я делаю можешь зайти на мой web-сайт <a href="https://cryptonerf.github.io/portfolio/" target="_blank">cryptonerf.github.io/portfolio</a> где я собираю свои работы.<br><br>Или в мой telegram канал <a href="https://t.me/solnechnoederevo" target="_blank">t.me/solnechnoederevo</a> где я ещё чаще делюсь своей жизнью!'
+      text: 'Ээээ ну вроде всё. Спасибо тебе дорогой пользователь за интерес к проекту. Надеюсь он поможет тебе сделать что-то красивое или увлечёт тебя.<br>Если тебе стало интересно узнать что ещё я делаю можешь зайти на мой web-сайт <a href="https://cryptonerf.github.io/portfolio/" target="_blank">cryptonerf.github.io/portfolio</a> где я собираю свои работы.<br>Или в мой telegram канал <a href="https://t.me/solnechnoederevo" target="_blank">t.me/solnechnoederevo</a> где я ещё чаще делюсь своей жизнью!'
     }
   }
 };
@@ -181,7 +181,7 @@ function getManualPages(lang) {
     },
     {
       title: t.welcome.title,
-      html: `<div style="font-size: 16px; line-height: 1.8; text-align: left;">${t.welcome.text}</div>`
+      html: `<div style="font-size: 18px; line-height: 1.8; text-align: left;">${t.welcome.text}</div>`
     },
     {
       title: t.gestures.create.title,
@@ -256,7 +256,7 @@ function getManualPages(lang) {
     // Финальная страница
     {
       title: t.finalPage.title,
-      html: `<div style="font-size: 16px; line-height: 1.8; text-align: left;">${t.finalPage.text}</div>`,
+      html: `<div style="font-size: 18px; line-height: 1.8; text-align: left;">${t.finalPage.text}</div>`,
       image: 'img/manual/Emile.png'
     },
     // Задняя обложка
@@ -397,6 +397,9 @@ function renderBook(lang, savedPage = 0) {
   const bookElement = document.getElementById('book');
   const bookWrapper = bookElement.parentElement;
   const manualPages = getManualPages(lang);
+
+  // Устанавливаем класс языка на body
+  document.body.className = lang === 'ru' ? 'lang-ru' : 'lang-en';
 
   // Полностью пересоздаём элемент книги
   const newBookElement = document.createElement('div');

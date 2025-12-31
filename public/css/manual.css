@@ -1,7 +1,7 @@
 @font-face {
     font-family: 'SysfontC';
-    src: url('../SysfontC.woff2') format('woff2'),
-         url('../SysfontC.woff') format('woff');
+    src: url('../fonts/SysfontC.woff2') format('woff2'),
+         url('../fonts/SysfontC.woff') format('woff');
     font-weight: normal;
     font-style: normal;
 }

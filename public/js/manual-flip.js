@@ -256,7 +256,8 @@ function getManualPages(lang) {
     // Финальная страница
     {
       title: t.finalPage.title,
-      html: `<div style="font-size: 16px; line-height: 1.8; text-align: left;">${t.finalPage.text}</div>`
+      html: `<div style="font-size: 16px; line-height: 1.8; text-align: left;">${t.finalPage.text}</div>`,
+      image: 'img/manual/Emile.png'
     },
     // Задняя обложка
     {

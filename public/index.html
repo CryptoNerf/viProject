@@ -1403,11 +1403,6 @@
             <button id="clearBtn">Clear all</button>
             <button id="modeToggleBtn">Editor mode</button>
 
-            <div class="checkbox-group" id="gestureDebugCheckbox" style="margin-top: 10px;">
-                <input type="checkbox" id="showGestureDebug">
-                <label for="showGestureDebug">Gesture debug</label>
-            </div>
-
             <h3 style="margin-top: 15px; margin-bottom: 8px; font-size: 16px; border-top: 2px solid #000000; padding-top: 10px; text-transform: uppercase;">Export</h3>
 
             <div class="checkbox-group">
@@ -1607,12 +1602,32 @@
         let selectedMolecule = null; // Выбранная молекула в редакторе
         let hoveredMoleculeEditor = null; // Молекула под курсором в редакторе
 
-        // === ОТЛАДКА ЖЕСТОВ ===
-        let showGestureDebug = false; // Показывать ли индикатор отладки жестов
         let currentTool = 'fill'; // Текущий инструмент (fill, pencil, eraser)
         let primaryColor = '#000000'; // Основной цвет
         let secondaryColor = '#ffffff'; // Фоновый цвет
         let fillMode = 'both'; // Режим заливки: 'interior' (внутренность), 'edge' (контур), 'both' (оба)
+
+        // === ИКОНКИ ЖЕСТОВ ===
+        const gestureIcons = {
+            open: new Image(),
+            lock: new Image(),
+            unlock: new Image(),
+            delete: new Image()
+        };
+        gestureIcons.open.src = 'icons/open_hand.png';
+        gestureIcons.lock.src = 'icons/lock_hand.png';
+        gestureIcons.unlock.src = 'icons/unlock_hand.png';
+        gestureIcons.delete.src = 'icons/delete_hand.png';
+        let gestureIconsLoaded = false;
+        Promise.all([
+            new Promise(resolve => gestureIcons.open.onload = resolve),
+            new Promise(resolve => gestureIcons.lock.onload = resolve),
+            new Promise(resolve => gestureIcons.unlock.onload = resolve),
+            new Promise(resolve => gestureIcons.delete.onload = resolve)
+        ]).then(() => {
+            gestureIconsLoaded = true;
+            console.log('Gesture icons loaded');
+        });
 
         // === ФОРМЫ МОЛЕКУЛ ===
         let selectedShape = 'circle'; // Выбранная форма для создания молекул
@@ -3336,8 +3351,8 @@
                 if (currentTool === 'fill') {
                     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                     ctx.font = '14px Arial';
-                    const hint = fillMode === 'interior' ? '🪣 Внутренность' :
-                                 fillMode === 'edge' ? '🪣 Контур' : '🪣 Оба';
+                    const hint = fillMode === 'interior' ? 'Interior' :
+                                 fillMode === 'edge' ? 'Edge' : 'Both';
                     const metrics = ctx.measureText(hint);
                     ctx.fillText(hint, mol.x - metrics.width / 2, mol.y - mol.size - 10);
                 }
@@ -5080,7 +5095,7 @@
                     ctx.fillStyle = 'rgba(50, 150, 255, 0.8)';
                     ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
                     ctx.lineWidth = 2;
-                    const hint = 'Режим редактирования (откройте рот для выхода)';
+                    const hint = 'Edit mode (open mouth to exit)';
                     ctx.strokeText(hint, mol.x, mol.y + 55);
                     ctx.fillText(hint, mol.x, mol.y + 55);
                 } else if (mol.isGrabbed) {
@@ -5110,7 +5125,7 @@
                     ctx.lineWidth = 2;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
-                    const hintText = 'Откройте рот для редактирования';
+                    const hintText = 'Open mouth to edit';
                     ctx.strokeText(hintText, mol.x, mol.y + 35);
                     ctx.fillText(hintText, mol.x, mol.y + 35);
                 }
@@ -5163,26 +5178,26 @@
 
             // Визуализация рук
             hands.forEach(hand => {
-                let color, label;
+                let color, iconKey;
                 // УЛУЧШЕНО: Приоритетный порядок отображения жестов
                 if (hand.isPinching) {
                     color = 'rgba(255, 100, 100, 0.6)';
-                    label = '✌️';
+                    iconKey = null; // No icon for pinch yet
                 } else if (hand.isPinky) {
                     color = 'rgba(255, 200, 0, 0.7)';
-                    label = '🤙';
+                    iconKey = 'unlock';
                 } else if (hand.isCrossed) {
                     color = 'rgba(255, 50, 150, 0.7)';
-                    label = '🤞';
+                    iconKey = 'delete';
                 } else if (hand.isFist) {
                     color = 'rgba(255, 150, 50, 0.6)';
-                    label = '🤌';
+                    iconKey = 'lock';
                 } else if (hand.isOpen) {
                     color = 'rgba(100, 255, 100, 0.6)';
-                    label = '✋';
+                    iconKey = 'open';
                 } else {
                     color = 'rgba(150, 150, 150, 0.5)';
-                    label = '';
+                    iconKey = null;
                 }
 
                 ctx.fillStyle = color;
@@ -5194,12 +5209,16 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                // Emoji для жеста
-                if (label) {
-                    ctx.font = '20px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(label, hand.x, hand.y - 35);
+                // Icon для жеста
+                if (iconKey && gestureIconsLoaded && gestureIcons[iconKey]) {
+                    const iconSize = 24;
+                    ctx.drawImage(
+                        gestureIcons[iconKey],
+                        hand.x - iconSize / 2,
+                        hand.y - 50,
+                        iconSize,
+                        iconSize
+                    );
                 }
 
                 // Индикатор прогресса удержания pinch для создания молекулы
@@ -5319,107 +5338,6 @@
                 ctx.restore();
 
                 currentYOffset += boxHeight + 10; // Смещение для следующего индикатора
-            }
-
-            // НОВОЕ: Индикатор текущих жестов (для отладки детекции)
-            if (hands.length > 0 && !editorMode && showGestureDebug) {
-                ctx.save();
-                ctx.font = 'bold 14px Arial';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'top';
-
-                const padding = 10;
-                const lineHeight = 22;
-                let debugLines = [];
-
-                // Иконки для жестов
-                const gestureIcons = {
-                    'fist': '🤌',
-                    'open': '✋',
-                    'pinch': '🤏',
-                    'crossed': '🤞',
-                    'pinky': '🤙',
-                    'none': '❓'
-                };
-
-                // Собираем информацию о каждой руке
-                hands.forEach((hand, idx) => {
-                    const handLabel = `Рука ${idx + 1}`;
-                    let gesture = 'none';
-
-                    if (hand.isFist) gesture = 'fist';
-                    else if (hand.isPinching) gesture = 'pinch';
-                    else if (hand.isCrossed) gesture = 'crossed';
-                    else if (hand.isPinky) gesture = 'pinky';
-                    else if (hand.isOpen) gesture = 'open';
-
-                    const icon = gestureIcons[gesture] || '❓';
-                    const gestureName = {
-                        'fist': 'Пальцы вместе',
-                        'open': 'Открыта',
-                        'pinch': 'Щипок',
-                        'crossed': 'Скрещены',
-                        'pinky': 'Мизинец',
-                        'none': 'Нет жеста'
-                    }[gesture];
-
-                    debugLines.push(`${icon} ${handLabel}: ${gestureName}`);
-                });
-
-                // Показываем стабильность жестов (сколько из 10 кадров)
-                const stabilityInfo = [];
-                for (const [gestureName, data] of Object.entries(GESTURE_STABILITY)) {
-                    const count = data.history.filter(v => v).length;
-                    const required = data.required;
-                    if (count > 0) {
-                        const percent = Math.round((count / GESTURE_HISTORY_SIZE) * 100);
-                        const stableIcon = count >= required ? '✓' : '○';
-                        const nameRu = {
-                            'fist': 'Пальцы вместе',
-                            'pinch': 'Щипок',
-                            'crossed': 'Скрещены',
-                            'pinky': 'Мизинец',
-                            'open': 'Открыта'
-                        }[gestureName] || gestureName;
-                        stabilityInfo.push(`${stableIcon} ${nameRu}: ${count}/${required} (${percent}%)`);
-                    }
-                }
-
-                if (stabilityInfo.length > 0) {
-                    debugLines.push('─ Стабильность ─');
-                    debugLines = debugLines.concat(stabilityInfo);
-                }
-
-                // Вычисляем размер бокса
-                const maxWidth = Math.max(...debugLines.map(line => ctx.measureText(line).width));
-                const boxWidth = maxWidth + padding * 2;
-                const boxHeight = debugLines.length * lineHeight + padding * 2;
-
-                // Рисуем фон
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-                ctx.fillRect(10, currentYOffset, boxWidth, boxHeight);
-
-                // Рамка
-                ctx.strokeStyle = 'rgba(100, 200, 255, 0.5)';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(10, currentYOffset, boxWidth, boxHeight);
-
-                // Рисуем текст
-                debugLines.forEach((line, idx) => {
-                    // Разные цвета для разных типов строк
-                    if (line.includes('✓')) {
-                        ctx.fillStyle = 'rgba(100, 255, 100, 1)'; // Зеленый для стабильных жестов
-                    } else if (line.includes('○')) {
-                        ctx.fillStyle = 'rgba(255, 200, 100, 1)'; // Желтый для нестабильных
-                    } else if (line.includes('─')) {
-                        ctx.fillStyle = 'rgba(150, 150, 150, 1)'; // Серый для разделителя
-                    } else {
-                        ctx.fillStyle = 'rgba(200, 220, 255, 1)'; // Голубой для обычного текста
-                    }
-                    ctx.fillText(line, 10 + padding, currentYOffset + padding + idx * lineHeight);
-                });
-
-                ctx.restore();
             }
 
             requestAnimationFrame(animate);
@@ -6013,7 +5931,6 @@
             const paintToolbar = document.getElementById('paintToolbar');
             // colorPalette уже определена глобально, используем её
             const controlsPanel = document.getElementById('controls');
-            const gestureDebugCheckbox = document.getElementById('gestureDebugCheckbox');
 
             if (editorMode) {
                 // Переход в режим редактора
@@ -6046,9 +5963,6 @@
                     colorPalette.classList.add('active');
                 }
 
-                // Скрываем чекбокс отладки жестов в режиме редактора
-                gestureDebugCheckbox.style.display = 'none';
-
                 // ИСПРАВЛЕНО: Не замораживаем молекулы, они остаются "живыми"
                 // Цвета и эффекты применяются напрямую к молекулам
 
@@ -6080,9 +5994,6 @@
                     colorPalette.classList.remove('active');
                 }
 
-                // Показываем чекбокс отладки жестов в режиме жестов
-                gestureDebugCheckbox.style.display = 'flex';
-
                 selectedMolecule = null;
 
                 // ИСПРАВЛЕНО: Цвета и эффекты уже применены напрямую к молекулам
@@ -6094,11 +6005,6 @@
 
         // Обработчик кнопки переключения режима
         document.getElementById('modeToggleBtn').addEventListener('click', toggleEditorMode);
-
-        // Обработчик чекбокса отладки жестов
-        document.getElementById('showGestureDebug').addEventListener('change', (e) => {
-            showGestureDebug = e.target.checked;
-        });
 
         // Выбор инструмента
         // Функция для выбора инструмента
@@ -6433,19 +6339,19 @@
                     frozenMolecules[molIndex].stripeSpacing = clickedMolecule.stripeSpacing;
                 }
 
-                const modeText = fillMode === 'interior' ? 'внутренность' :
-                                 fillMode === 'edge' ? 'контур' : 'внутренность+контур';
+                const modeText = fillMode === 'interior' ? 'interior' :
+                                 fillMode === 'edge' ? 'edge' : 'interior+edge';
                 const effectsText = [];
-                if (clickedMolecule.emboss) effectsText.push('тиснение');
-                if (clickedMolecule.microStripes) effectsText.push('полоски');
+                if (clickedMolecule.emboss) effectsText.push('emboss');
+                if (clickedMolecule.microStripes) effectsText.push('stripes');
                 const effectsSuffix = effectsText.length > 0 ? ' + ' + effectsText.join(' + ') : '';
-                status.textContent = `Залито ${modeText} цветом ${primaryColor}${effectsSuffix}`;
+                status.textContent = `Filled ${modeText} with ${primaryColor}${effectsSuffix}`;
                 saveState(); // Сохраняем состояние для отмены
             } else if (currentTool === 'fill' && !clickedMolecule) {
                 // Заливка областей, нарисованных карандашом (flood fill)
                 const fillResult = floodFillStrokes(clickX, clickY, primaryColor);
                 if (fillResult === 'too_large') {
-                    status.textContent = '⚠️ Область слишком большая! Нарисуйте замкнутую фигуру карандашом';
+                    status.textContent = 'Area too large! Draw a closed shape with pencil';
                 } else if (fillResult) {
                     // Определяем - фоновая заливка или обычная
                     const fillArea = fillResult.width * fillResult.height;
@@ -6457,15 +6363,15 @@
 
                     if (isBackground) {
                         backgroundFills.push(fillResult);
-                        status.textContent = `🖼️ Фон залит цветом ${primaryColor}`;
+                        status.textContent = `Background filled with ${primaryColor}`;
                         saveState(); // Сохраняем состояние для отмены
                     } else {
                         filledRegions.push(fillResult);
-                        status.textContent = `🪣 Залито ${fillArea} пикселей цветом ${primaryColor}`;
+                        status.textContent = `Filled ${fillArea} pixels with ${primaryColor}`;
                         saveState(); // Сохраняем состояние для отмены
                     }
                 } else {
-                    status.textContent = 'Нечего заливать (кликните внутри замкнутой области)';
+                    status.textContent = 'Nothing to fill (click inside closed area)';
                 }
             } else if (currentTool === 'eraser' && clickedMolecule) {
                 // Ластик удаляет заливку в зависимости от режима
@@ -6491,9 +6397,9 @@
                     frozenMolecules[molIndex].microStripes = false;
                 }
 
-                const modeText = fillMode === 'interior' ? 'внутренность' :
-                                 fillMode === 'edge' ? 'контур' : 'внутренность+контур';
-                status.textContent = `Стёрто ${modeText}`;
+                const modeText = fillMode === 'interior' ? 'interior' :
+                                 fillMode === 'edge' ? 'edge' : 'interior+edge';
+                status.textContent = `Erased ${modeText}`;
                 saveState(); // Сохраняем состояние для отмены
             }
         });
@@ -6714,12 +6620,12 @@
                             editStartStretchX = mol.stretchX;
                             editStartStretchY = mol.stretchY;
                             editStartAngle = mol.deformAngle;
-                            status.textContent = '✅ Молекула выбрана (мышь=перемещение, Ctrl=размер, Shift=растяжение, Alt=вращение)';
+                            status.textContent = 'Molecule selected (mouse=move, Ctrl=size, Shift=stretch, Alt=rotate)';
                             break;
                         }
                     }
                     if (!selectedMoleculeUI) {
-                        status.textContent = 'Кликните на молекулу чтобы выбрать';
+                        status.textContent = 'Click molecule to select';
                     }
                 } else if (moleculeTool === 'create') {
                     // Создаем новую молекулу с размером из панели параметров
@@ -6730,7 +6636,7 @@
                     newMol.vy = (Math.random() - 0.5) * 2;
                     molecules.push(newMol);
                     saveState();
-                    status.textContent = `Создана молекула (форма: ${selectedShape}, размер: ${config.moleculeSize})`;
+                    status.textContent = `Created molecule (shape: ${selectedShape}, size: ${config.moleculeSize})`;
                 } else if (moleculeTool === 'delete') {
                     // Удаляем молекулу под курсором
                     for (let i = molecules.length - 1; i >= 0; i--) {
@@ -6743,11 +6649,11 @@
                             molecules.splice(i, 1);
                             selectedMoleculeUI = null;
                             saveState();
-                            status.textContent = 'Молекула удалена';
+                            status.textContent = 'Molecule deleted';
                             return;
                         }
                     }
-                    status.textContent = 'Кликните на молекулу чтобы удалить';
+                    status.textContent = 'Click molecule to delete';
                 }
                 return;
             }
@@ -6785,7 +6691,7 @@
                         });
                         if (drawnStrokes.length < initialLength) {
                             deletedSomething = true;
-                            status.textContent = 'Контур удален';
+                            status.textContent = 'Contour deleted';
                         }
                     }
 
@@ -6829,12 +6735,12 @@
 
                         if (filledRegions.length < initialLength || backgroundFills.length < initialBgLength) {
                             deletedSomething = true;
-                            status.textContent = 'Заливка удалена';
+                            status.textContent = 'Fill deleted';
                         }
                     }
 
                     if (!deletedSomething) {
-                        status.textContent = 'Нечего удалять (кликните на контур или заливку)';
+                        status.textContent = 'Nothing to delete (click on contour or fill)';
                     }
                 } else {
                     // ОБЫЧНЫЙ ЛАСТИК: работает при движении мыши (в mousemove)
@@ -6865,13 +6771,13 @@
                     selectedMoleculeUI.size = newSize;
                     selectedMoleculeUI.targetSize = newSize;
                     selectedMoleculeUI.baseSize = newSize;
-                    status.textContent = `📏 Размер: ${Math.round(newSize)}px (Ctrl+мышь вверх/вниз)`;
+                    status.textContent = `Size: ${Math.round(newSize)}px (Ctrl+mouse up/down)`;
                 } else if (e.altKey) {
                     // Alt: горизонтальное движение = вращение
                     const deltaX = (x - editStartX) * 0.01;
                     selectedMoleculeUI.deformAngle = (editStartAngle + deltaX) % (Math.PI * 2);
                     const degrees = (selectedMoleculeUI.deformAngle * 180 / Math.PI).toFixed(0);
-                    status.textContent = `🔄 Вращение: ${degrees}° (Alt+мышь влево/вправо)`;
+                    status.textContent = `Rotation: ${degrees}° (Alt+mouse left/right)`;
                 } else if (e.shiftKey) {
                     // Shift: свободное растяжение по обеим осям
                     const deltaX = (x - editStartX) * 0.01;
@@ -6880,14 +6786,14 @@
                     const newStretchY = Math.max(0.2, Math.min(5.0, editStartStretchY + deltaY));
                     selectedMoleculeUI.stretchX = newStretchX;
                     selectedMoleculeUI.stretchY = newStretchY;
-                    status.textContent = `↔️↕️ Растяжение X: ${newStretchX.toFixed(2)}, Y: ${newStretchY.toFixed(2)} (Shift+мышь)`;
+                    status.textContent = `Stretch X: ${newStretchX.toFixed(2)}, Y: ${newStretchY.toFixed(2)} (Shift+mouse)`;
                 } else {
                     // Без модификаторов: перемещение
                     selectedMoleculeUI.x = x - dragOffsetX;
                     selectedMoleculeUI.y = y - dragOffsetY;
                     selectedMoleculeUI.targetX = selectedMoleculeUI.x;
                     selectedMoleculeUI.targetY = selectedMoleculeUI.y;
-                    status.textContent = `Перемещение (Ctrl=размер, Shift=растяжение, Alt=вращение)`;
+                    status.textContent = 'Moving (Ctrl=size, Shift=stretch, Alt=rotate)';
                 }
                 return;
             }
@@ -6943,7 +6849,7 @@
                 }
 
                 if (erasedCount > 0) {
-                    status.textContent = `Стирание контура (точек стерто: ${erasedCount})`;
+                    status.textContent = `Erasing contour (points erased: ${erasedCount})`;
                 }
 
                 // Стираем залитые области (если режим interior или both)
@@ -6993,7 +6899,7 @@
                     }
                 }
 
-                status.textContent = `Штрихов: ${drawnStrokes.length}, Областей: ${filledRegions.length}`;
+                status.textContent = `Strokes: ${drawnStrokes.length}, Regions: ${filledRegions.length}`;
             }
         });
 
@@ -7004,7 +6910,7 @@
             if (!currentTool && isDraggingMolecule && selectedMoleculeUI) {
                 isDraggingMolecule = false;
                 saveState();
-                status.textContent = '✅ Операция завершена';
+                status.textContent = 'Operation completed';
                 return;
             }
 
@@ -7019,7 +6925,7 @@
             if (currentTool === 'pencil') {
                 if (currentStroke && currentStroke.points.length > 1) {
                     drawnStrokes.push(currentStroke);
-                    status.textContent = `Нарисовано ${drawnStrokes.length} штрихов`;
+                    status.textContent = `Drew ${drawnStrokes.length} strokes`;
                     saveState(); // Сохраняем состояние для отмены
                 }
                 currentStroke = null;
@@ -7036,7 +6942,7 @@
             if (!currentTool && isDraggingMolecule) {
                 isDraggingMolecule = false;
                 saveState();
-                status.textContent = '✅ Операция завершена';
+                status.textContent = 'Operation completed';
                 return;
             }
 
@@ -7051,7 +6957,7 @@
             if (currentTool === 'pencil') {
                 if (currentStroke && currentStroke.points.length > 1) {
                     drawnStrokes.push(currentStroke);
-                    status.textContent = `Нарисовано ${drawnStrokes.length} штрихов`;
+                    status.textContent = `Drew ${drawnStrokes.length} strokes`;
                     saveState(); // Сохраняем состояние для отмены
                 }
                 currentStroke = null;
@@ -7075,7 +6981,7 @@
                 selectedMoleculeUI.targetSize = newSize;
                 selectedMoleculeUI.baseSize = newSize;
 
-                status.textContent = `📏 Размер: ${Math.round(newSize)}px (колёсико мыши)`;
+                status.textContent = `Size: ${Math.round(newSize)}px (mouse wheel)`;
             }
         }, { passive: false }); // passive: false чтобы preventDefault работал
 
@@ -7107,9 +7013,9 @@
                         isLocked: false, // Новая молекула не должна быть заблокирована
                         isShapeLocked: false
                     };
-                    status.textContent = 'Молекула скопирована (Ctrl+V для вставки)';
+                    status.textContent = 'Molecule copied (Ctrl+V to paste)';
                 } else {
-                    status.textContent = '⚠️ Выберите молекулу для копирования';
+                    status.textContent = 'Select molecule to copy';
                 }
             }
 
@@ -7145,9 +7051,9 @@
 
                     // Выбираем вставленную молекулу
                     selectedMoleculeUI = newMol;
-                    status.textContent = `📌 Молекула вставлена (x: ${Math.round(pasteX)}, y: ${Math.round(pasteY)})`;
+                    status.textContent = `Molecule pasted (x: ${Math.round(pasteX)}, y: ${Math.round(pasteY)})`;
                 } else {
-                    status.textContent = '⚠️ Сначала скопируйте молекулу (Ctrl+C)';
+                    status.textContent = 'First copy a molecule (Ctrl+C)';
                 }
             }
 
@@ -7160,10 +7066,10 @@
                         molecules.splice(index, 1);
                         selectedMoleculeUI = null;
                         saveState();
-                        status.textContent = 'Молекула удалена (Delete)';
+                        status.textContent = 'Molecule deleted (Delete)';
                     }
                 } else {
-                    status.textContent = '⚠️ Выберите молекулу для удаления';
+                    status.textContent = 'Select molecule to delete';
                 }
             }
         });
@@ -7236,9 +7142,9 @@
                                     frozenMolecules[molIndex].microStripes = false;
                                 }
 
-                                const modeText = fillMode === 'interior' ? 'внутренность' :
-                                                 fillMode === 'edge' ? 'контур' : 'внутренность+контур';
-                                status.textContent = `Стёрто ${modeText} молекулы`;
+                                const modeText = fillMode === 'interior' ? 'interior' :
+                                                 fillMode === 'edge' ? 'edge' : 'interior+edge';
+                                status.textContent = `Erased ${modeText} of molecule`;
                                 saveState(); // Сохраняем состояние для отмены
                             } else if (smartEraserMode) {
                                 // Умный ластик - удаляем штрихи и заливки целиком
@@ -7254,7 +7160,7 @@
                                     });
                                     if (drawnStrokes.length < initialLength) {
                                         deletedSomething = true;
-                                        status.textContent = 'Контур удален';
+                                        status.textContent = 'Contour deleted';
                                     }
                                 }
                                 if (fillMode === 'interior' || fillMode === 'both') {
@@ -7288,11 +7194,11 @@
 
                                     if (filledRegions.length < initialLength || backgroundFills.length < initialBgLength) {
                                         deletedSomething = true;
-                                        status.textContent = 'Заливка удалена';
+                                        status.textContent = 'Fill deleted';
                                     }
                                 }
                                 if (!deletedSomething) {
-                                    status.textContent = 'Нечего удалять';
+                                    status.textContent = 'Nothing to delete';
                                 } else {
                                     saveState(); // Сохраняем состояние для отмены
                                 }
@@ -7331,13 +7237,13 @@
                                     }
                                 }
 
-                                status.textContent = `🪣 Молекула залита цветом`;
+                                status.textContent = 'Molecule filled with color';
                                 saveState(); // Сохраняем состояние для отмены
                             } else {
                                 // Заливка нарисованных областей
                                 const fillResult = floodFillStrokes(x, y, primaryColor);
                                 if (fillResult === 'too_large') {
-                                    status.textContent = '⚠️ Область слишком большая! Нарисуйте замкнутую фигуру';
+                                    status.textContent = 'Area too large! Draw a closed shape';
                                 } else if (fillResult) {
                                     // Определяем - фоновая заливка или обычная
                                     const fillArea = fillResult.width * fillResult.height;
@@ -7349,15 +7255,15 @@
 
                                     if (isBackground) {
                                         backgroundFills.push(fillResult);
-                                        status.textContent = `🖼️ Фон залит цветом ${primaryColor}`;
+                                        status.textContent = `Background filled with ${primaryColor}`;
                                         saveState(); // Сохраняем состояние для отмены
                                     } else {
                                         filledRegions.push(fillResult);
-                                        status.textContent = `🪣 Область залита цветом ${primaryColor}`;
+                                        status.textContent = `Area filled with ${primaryColor}`;
                                         saveState(); // Сохраняем состояние для отмены
                                     }
                                 } else {
-                                    status.textContent = '⚠️ Не удалось залить (нет замкнутой области)';
+                                    status.textContent = 'Cannot fill (no closed area)';
                                 }
                             }
                         }
@@ -7389,19 +7295,19 @@
                                 const index = molecules.indexOf(touchedMolecule);
                                 if (index > -1) {
                                     molecules.splice(index, 1);
-                                    status.textContent = `Молекула удалена | ${molecules.length}/${maxMolecules}`;
+                                    status.textContent = `Molecule deleted | ${molecules.length}/${maxMolecules}`;
                                 }
                                 touchedMolecule = null;
                             } else if (virtualMode === 'scale-up') {
                                 touchedMolecule.targetSize = Math.min(maxMoleculeSize, touchedMolecule.size + 20);
-                                status.textContent = `⬆️ Размер: ${Math.round(touchedMolecule.targetSize)}`;
+                                status.textContent = `Size: ${Math.round(touchedMolecule.targetSize)}`;
                             } else if (virtualMode === 'scale-down') {
                                 touchedMolecule.targetSize = Math.max(minMoleculeSize, touchedMolecule.size - 20);
-                                status.textContent = `⬇️ Размер: ${Math.round(touchedMolecule.targetSize)}`;
+                                status.textContent = `Size: ${Math.round(touchedMolecule.targetSize)}`;
                             } else if (virtualMode === 'move') {
                                 virtualSelectedMolecule = touchedMolecule;
                                 touchedMolecule.isGrabbed = true;
-                                status.textContent = `✋ Перемещение молекулы`;
+                                status.textContent = 'Moving molecule';
                             }
                         } else {
                             // Стандартное поведение без виртуальных кнопок
@@ -7411,7 +7317,7 @@
                                 const index = molecules.indexOf(touchedMolecule);
                                 if (index > -1) {
                                     molecules.splice(index, 1);
-                                    status.textContent = `Молекула удалена (длинное нажатие)`;
+                                    status.textContent = 'Molecule deleted (long press)';
                                     touchedMolecule = null;
                                 }
                             }, LONG_PRESS_DURATION);
@@ -7429,7 +7335,7 @@
                             newMol.shapes = [{type: selectedShape, weight: 1}];
                             molecules.push(newMol);
                             touchedMolecule = newMol;
-                            status.textContent = `Молекула создана | ${molecules.length}/${maxMolecules}`;
+                            status.textContent = `Molecule created | ${molecules.length}/${maxMolecules}`;
                             saveState(); // Сохраняем состояние для отмены
                         }
                     }
@@ -7586,7 +7492,7 @@
                     touchedMolecule.targetX = centerX;
                     touchedMolecule.targetY = centerY;
 
-                    status.textContent = `📏 Размер: ${Math.round(newSize)}px (pinch)`;
+                    status.textContent = `Size: ${Math.round(newSize)}px (pinch)`;
                 }
             }, { passive: false });
 
@@ -7598,7 +7504,7 @@
                     if (currentTool === 'pencil' && currentStroke && currentStroke.points.length > 0) {
                         drawnStrokes.push(currentStroke);
                         currentStroke = null;
-                        status.textContent = `✏️ Штрих нарисован | Всего: ${drawnStrokes.length}`;
+                        status.textContent = `Stroke drawn | Total: ${drawnStrokes.length}`;
                         saveState(); // Сохраняем состояние для отмены
                     } else if (currentTool === 'eraser') {
                         // Сохраняем состояние после стирания
@@ -7682,7 +7588,7 @@
             } else {
                 console.log('⚠️ Частичная инициализация - Камера:', !!camera, 'Аудио:', !!audio);
                 loading.style.display = 'none';
-                status.textContent = camera ? 'Работает без звука' : 'Работает без камеры';
+                status.textContent = camera ? 'Running without sound' : 'Running without camera';
                 if (camera) detectHands();
             }
 

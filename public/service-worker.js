@@ -1,67 +1,82 @@
-const CACHE_NAME = 'molecules-v1';
-const urlsToCache = [
+// Версия кеша. Увеличивайте при изменении стратегии кеширования
+// или при обновлении файлов MediaPipe (они берутся из кеша без проверки сети).
+const CACHE_NAME = 'vi-project-v2';
+
+// Минимальный набор для запуска оболочки приложения без сети
+const PRECACHE_URLS = [
   '/',
   '/index.html',
-  '/molecules_icon.png',
-  '/manifest.json'
+  '/manifest.json',
+  '/molecules_icon.png'
 ];
 
-// Установка service worker и кэширование ресурсов
+// Большие и редко меняющиеся файлы: сначала кеш (модели MediaPipe ~25 МБ, картинки, шрифты, иконки).
+// Всё остальное (HTML, JS, CSS) - сначала сеть, чтобы обновления сайта сразу доходили до пользователей.
+// Раньше index.html тоже отдавался из кеша, и пользователи навсегда оставались на старой версии.
+const CACHE_FIRST_PATHS = ['/mediapipe/', '/icons/', '/img/', '/fonts/'];
+
+// Установка service worker и кэширование оболочки
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
+      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(() => self.skipWaiting()) // Новая версия активируется без ожидания закрытия вкладок
   );
 });
 
 // Активация service worker и удаление старых кэшей
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys()
+      .then(cacheNames => Promise.all(
+        cacheNames
+          .filter(cacheName => cacheName !== CACHE_NAME)
+          .map(cacheName => caches.delete(cacheName))
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
-// Обработка запросов - сначала кэш, потом сеть
+function putInCache(request, response) {
+  // Кешируем только успешные ответы своего сайта
+  if (response.ok && response.type === 'basic') {
+    const copy = response.clone();
+    caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+  }
+  return response;
+}
+
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  return putInCache(request, await fetch(request));
+}
+
+async function networkFirst(request) {
+  try {
+    return putInCache(request, await fetch(request));
+  } catch (error) {
+    // Нет сети - отдаём последнюю сохранённую версию
+    const cached = await caches.match(request, { ignoreSearch: request.mode === 'navigate' });
+    if (cached) return cached;
+    throw error;
+  }
+}
+
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Возвращаем из кэша, если есть
-        if (response) {
-          return response;
-        }
+  const request = event.request;
 
-        // Иначе делаем запрос к сети
-        return fetch(event.request).then(
-          response => {
-            // Проверяем что ответ корректный
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
+  // Кеш работает только с GET; запросы с Range (перемотка видео) пропускаем как есть
+  if (request.method !== 'GET' || request.headers.has('range')) return;
 
-            // Клонируем ответ для кэша
-            const responseToCache = response.clone();
+  const url = new URL(request.url);
 
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
+  // Сторонние ресурсы (CDN MediaPipe, page-flip) браузер кеширует сам
+  if (url.origin !== self.location.origin) return;
 
-            return response;
-          }
-        );
-      })
-  );
+  if (CACHE_FIRST_PATHS.some(path => url.pathname.startsWith(path))) {
+    event.respondWith(cacheFirst(request));
+  } else {
+    event.respondWith(networkFirst(request));
+  }
 });

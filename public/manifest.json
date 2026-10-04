@@ -1,8 +1,9 @@
 {
   "name": "Vi-Project",
   "short_name": "Molecules",
-  "description": "Visualize molecular structures in 3D directly in your browser.",
+  "description": "A tool for creating organic graphics with hand gestures, voice, mouse and touch.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f5f5f5",
   "theme_color": "#d4d0c8",
@@ -10,9 +11,9 @@
   "icons": [
     {
       "src": "molecules_icon.png",
-      "sizes": "any",
+      "sizes": "779x779",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

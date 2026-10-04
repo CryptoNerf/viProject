@@ -1,7 +1,24 @@
 // manual-flip.js
 
+// localStorage может быть недоступен (приватный режим, запрет cookies) - тогда работаем без сохранения
+function loadSavedLang() {
+  try {
+    return localStorage.getItem('manualLang');
+  } catch {
+    return null;
+  }
+}
+
+function saveLang(lang) {
+  try {
+    localStorage.setItem('manualLang', lang);
+  } catch {
+    // Язык просто не запомнится
+  }
+}
+
 // Текущий язык (загружаем из localStorage или используем английский по умолчанию)
-let currentLang = localStorage.getItem('manualLang') || 'en';
+let currentLang = loadSavedLang() === 'ru' ? 'ru' : 'en';
 
 // Переводы для книги
 const translations = {
@@ -19,7 +36,7 @@ const translations = {
       create: {
         title: 'CREATE MOLECULE',
         gesture: 'Pinch gesture with different fingers',
-        howTo: 'Hold your thumb with different fingers for 1 second to create different shapes:<br><br>Index + Thumb</strong> = Circle<br>Middle + Thumb</strong> = Triangle<br>Ring + Thumb</strong> = Heart<br>Pinky + Thumb</strong> = Star',
+        howTo: 'Hold your thumb with different fingers for 1 second to create different shapes:<br><br><b>Index + Thumb</b> = Circle<br><b>Middle + Thumb</b> = Triangle<br><b>Ring + Thumb</b> = Heart<br><b>Pinky + Thumb</b> = Star',
         func: 'Creates a new molecule at the pinch position'
       },
       editMode: {
@@ -37,7 +54,7 @@ const translations = {
       sizeShape: {
         title: 'SIZE & SHAPE',
         gesture: 'Hands in edit mode (✎)',
-        howTo: 'In edit mode:<br><br>Distance between fingers</strong> = molecule width<br>Two open hands</strong> = molecule shape (spread hands to stretch, bring together to compress)',
+        howTo: 'In edit mode:<br><br><b>Distance between fingers</b> = molecule width<br><b>Two open hands</b> = molecule shape (spread hands to stretch, bring together to compress)',
         func: 'Adjusts molecule size and shape dynamically'
       },
       lock: {
@@ -72,7 +89,7 @@ const translations = {
       },
       keyboard: {
         title: 'KEYBOARD SHORTCUTS',
-        html: '<div style="font-size: 20px; line-height: 2;"><strong>Ctrl+C</strong> → Copy selected molecule<br><strong>Ctrl+V</strong> → Paste copied molecule<br><strong>Ctrl+Z</strong> → Undo last action<br><strong>Delete</strong> → Delete selected molecule</div>',
+        html: '<div style="font-size: 20px; line-height: 2;"><strong>Ctrl+C</strong> → Copy selected molecule<br><strong>Ctrl+V</strong> → Paste copied molecule<br><strong>Ctrl+Z</strong> → Undo last action<br><strong>Ctrl+Shift+Z</strong> → Redo<br><strong>Delete</strong> → Delete selected molecule<br><small>On Mac: Cmd instead of Ctrl</small></div>',
         func: 'Quick actions using keyboard'
       }
     },
@@ -99,7 +116,7 @@ const translations = {
       create: {
         title: 'СОЗДАТЬ МОЛЕКУЛУ',
         gesture: 'Жест щипка разными пальцами',
-        howTo: 'Удерживайте большой палец с разными пальцами 1 секунду для создания разных форм:<br><br>Указательный + Большой</strong> = Круг<br>Средний + Большой</strong> = Треугольник<br>Безымянный + Большой</strong> = Сердце<br>Мизинец + Большой</strong> = Звезда',
+        howTo: 'Удерживайте большой палец с разными пальцами 1 секунду для создания разных форм:<br><br><b>Указательный + Большой</b> = Круг<br><b>Средний + Большой</b> = Треугольник<br><b>Безымянный + Большой</b> = Сердце<br><b>Мизинец + Большой</b> = Звезда',
         func: 'Создаёт новую молекулу в позиции щипка'
       },
       editMode: {
@@ -117,7 +134,7 @@ const translations = {
       sizeShape: {
         title: 'РАЗМЕР И ФОРМА',
         gesture: 'Руки в режиме редактирования (✎)',
-        howTo: 'В режиме редактирования:<br><br>Расстояние между пальцами</strong> = ширина молекулы<br>Две открытые руки</strong> = форма молекулы (разводишь руки - растягивается, сводишь - сжимается)',
+        howTo: 'В режиме редактирования:<br><br><b>Расстояние между пальцами</b> = ширина молекулы<br><b>Две открытые руки</b> = форма молекулы (разводишь руки - растягивается, сводишь - сжимается)',
         func: 'Динамически изменяет размер и форму молекулы'
       },
       lock: {
@@ -152,7 +169,7 @@ const translations = {
       },
       keyboard: {
         title: 'КЛАВИАТУРНЫЕ СОКРАЩЕНИЯ',
-        html: '<div style="font-size: 20px; line-height: 2;"><strong>Ctrl+C</strong> → Копировать выбранную молекулу<br><strong>Ctrl+V</strong> → Вставить скопированную молекулу<br><strong>Ctrl+Z</strong> → Отменить последнее действие<br><strong>Delete</strong> → Удалить выбранную молекулу</div>',
+        html: '<div style="font-size: 20px; line-height: 2;"><strong>Ctrl+C</strong> → Копировать выбранную молекулу<br><strong>Ctrl+V</strong> → Вставить скопированную молекулу<br><strong>Ctrl+Z</strong> → Отменить последнее действие<br><strong>Ctrl+Shift+Z</strong> → Повторить<br><strong>Delete</strong> → Удалить выбранную молекулу<br><small>На Mac: Cmd вместо Ctrl</small></div>',
         func: 'Быстрые действия с помощью клавиатуры'
       }
     },
@@ -391,31 +408,38 @@ function calculateManualBookDimensions() {
 // Глобальные переменные для книги
 let pageFlip;
 let currentPage = 0;
+let lastBookSize = null; // Размер страниц последнего рендера (для пропуска лишних перерисовок)
 
 // Функция рендера книги
 function renderBook(lang, savedPage = 0) {
-  const bookElement = document.getElementById('book');
-  const bookWrapper = bookElement.parentElement;
+  const bookWrapper = document.querySelector('.book-wrapper');
   const manualPages = getManualPages(lang);
 
-  // Устанавливаем класс языка на body
+  // Устанавливаем класс языка на body и язык документа
   document.body.className = lang === 'ru' ? 'lang-ru' : 'lang-en';
+  document.documentElement.lang = lang;
 
-  // Полностью пересоздаём элемент книги
+  // Уничтожаем предыдущий экземпляр: иначе его обработчики на window (resize, mousemove,
+  // touchmove, mouseup...) оставались жить после каждой смены языка или ресайза.
+  // destroy() сам удаляет корневой элемент книги.
+  if (pageFlip) {
+    pageFlip.destroy();
+    pageFlip = null;
+  }
+  const oldBookElement = document.getElementById('book');
+  if (oldBookElement) oldBookElement.remove();
+
+  // Полностью пересоздаём элемент книги (HTML собираем один раз, без innerHTML += в цикле)
   const newBookElement = document.createElement('div');
   newBookElement.id = 'book';
-
-  // Рендер страниц
-  manualPages.forEach((p, i) => {
-    newBookElement.innerHTML += createManualPageHTML(p, i, manualPages.length);
-  });
-
-  // Заменяем старый элемент новым
-  bookWrapper.removeChild(bookElement);
+  newBookElement.innerHTML = manualPages
+    .map((p, i) => createManualPageHTML(p, i, manualPages.length))
+    .join('');
   bookWrapper.appendChild(newBookElement);
 
   const totalPages = manualPages.length;
   const { width, height } = calculateManualBookDimensions();
+  lastBookSize = `${width}x${height}`;
 
   pageFlip = new St.PageFlip(newBookElement, {
     width,
@@ -464,8 +488,23 @@ function renderBook(lang, savedPage = 0) {
   setTimeout(updateUI, 100);
 }
 
+// Возврат в приложение. Мануал открывается из приложения в новой вкладке - в этом случае
+// просто закрываем её, а не открываем второй экземпляр приложения (с повторным запросом камеры).
+function goBackToApp() {
+  if (window.opener && !window.opener.closed) {
+    window.close();
+    return;
+  }
+  window.location.href = 'index.html';
+}
+
 // Инициализация manual-книги
 document.addEventListener('DOMContentLoaded', () => {
+  const backButton = document.getElementById('backButton');
+  if (backButton) {
+    backButton.addEventListener('click', goBackToApp);
+  }
+
   // Рендерим книгу с текущим языком
   renderBook(currentLang);
 
@@ -486,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
       currentLang = currentLang === 'en' ? 'ru' : 'en';
 
       // Сохраняем в localStorage
-      localStorage.setItem('manualLang', currentLang);
+      saveLang(currentLang);
 
       // Обновляем текст кнопки
       langText.textContent = currentLang === 'en' ? 'RU' : 'EN';
@@ -504,17 +543,21 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       if (pageFlip) pageFlip.flipNext();
+    } else if (e.key === 'Escape') {
+      goBackToApp();
     }
   });
 
-  // Ресайз
+  // Ресайз. Перерисовываем только если размер страниц действительно изменился:
+  // на телефонах resize срабатывает при каждом появлении/скрытии адресной строки.
   let resizeTimeout;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
+      const { width, height } = calculateManualBookDimensions();
+      if (`${width}x${height}` === lastBookSize) return;
       // Сохраняем текущую страницу при ресайзе
-      const savedPage = currentPage;
-      renderBook(currentLang, savedPage);
+      renderBook(currentLang, currentPage);
     }, 300);
   });
 });

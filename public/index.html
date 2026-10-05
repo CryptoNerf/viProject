@@ -1050,6 +1050,20 @@
             padding: 6px 16px;
         }
 
+        #debugHud {
+            position: absolute;
+            left: 50%;
+            bottom: 110px;
+            transform: translateX(-50%);
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #7dff7d;
+            font: 12px/1.5 monospace;
+            white-space: pre;
+            z-index: 40;
+            pointer-events: none;
+        }
+
         #hintToast {
             position: absolute;
             left: 50%;
@@ -1792,6 +1806,9 @@
             <div class="engine-note" id="engineNote"></div>
             <button id="engineRetry" hidden>Retry</button>
         </div>
+
+        <!-- Диагностика производительности: открыть страницу с ?debug в адресе -->
+        <div id="debugHud" hidden></div>
 
         <!-- Подсказки для новых пользователей -->
         <div id="hintToast" role="status" aria-live="polite" hidden>
@@ -3703,23 +3720,55 @@
             return Math.sqrt(dx * dx + dy * dy);
         }
 
+        const PINCH_FINGER_TIPS = { index: 8, middle: 12, ring: 16, pinky: 20 };
+
+        // Расстояния от кончика большого пальца до кончиков остальных
+        function pinchDistances(landmarks) {
+            const thumbTip = landmarks[4];
+            const distances = {};
+            for (const [name, tipIndex] of Object.entries(PINCH_FINGER_TIPS)) {
+                const tip = landmarks[tipIndex];
+                distances[name] = Math.hypot(thumbTip.x - tip.x, thumbTip.y - tip.y);
+            }
+            return distances;
+        }
+
+        // Сколько пальцев, КРОМЕ щипающего, вытянуто. В жестах из мануала при щипке остальные три
+        // пальца вытянуты, а в кулаке и при "указательный вверх" большой палец тоже касается согнутого
+        // пальца, но вытянут максимум один палец - раньше такие жесты засчитывались как щипок
+        // (у старого движка "указательный вверх" проходил мимо порога всего на 0.001).
+        // Вытянутость меряем относительно размера ладони (запястье -> основание среднего пальца),
+        // поэтому она не зависит от расстояния до камеры. Щипки из мануала: 0.73-1.03, кулак: 0.22-0.39.
+        const EXTENDED_FINGER_RATIO = 0.6;
+
+        function countOtherExtendedFingers(landmarks, pinchingFinger) {
+            const palmCenter = landmarks[9];
+            const handSize = Math.hypot(landmarks[0].x - palmCenter.x, landmarks[0].y - palmCenter.y) || 1;
+            let count = 0;
+            for (const [name, tipIndex] of Object.entries(PINCH_FINGER_TIPS)) {
+                if (name === pinchingFinger) continue;
+                const tip = landmarks[tipIndex];
+                if (Math.hypot(tip.x - palmCenter.x, tip.y - palmCenter.y) / handSize >= EXTENDED_FINGER_RATIO) {
+                    count++;
+                }
+            }
+            return count;
+        }
+
         // НОВОЕ: Улучшенная детекция щипка - проверяем pinch с любым пальцем (не только указательным)
         function isPinching(landmarks) {
-            const thumbTip = landmarks[4];
-
-            // Проверяем расстояние от большого пальца до каждого пальца
-            const distances = {
-                index: Math.sqrt((thumbTip.x - landmarks[8].x) ** 2 + (thumbTip.y - landmarks[8].y) ** 2),
-                middle: Math.sqrt((thumbTip.x - landmarks[12].x) ** 2 + (thumbTip.y - landmarks[12].y) ** 2),
-                ring: Math.sqrt((thumbTip.x - landmarks[16].x) ** 2 + (thumbTip.y - landmarks[16].y) ** 2),
-                pinky: Math.sqrt((thumbTip.x - landmarks[20].x) ** 2 + (thumbTip.y - landmarks[20].y) ** 2)
-            };
+            // Расстояние от большого пальца до каждого пальца
+            const distances = pinchDistances(landmarks);
 
             // Находим минимальное расстояние (какой палец ближе всего к большому)
             const minDist = Math.min(distances.index, distances.middle, distances.ring, distances.pinky);
 
             // СМЯГЧЕНО: Pinch если палец достаточно близко к большому
             if (minDist >= 0.055) return false;  // Было 0.035, теперь мягче для стабильности
+
+            // Остальные пальцы должны быть вытянуты (отличает щипок от кулака и "указательный вверх")
+            const pinchingFinger = Object.keys(distances).find(name => distances[name] === minDist);
+            if (countOtherExtendedFingers(landmarks, pinchingFinger) < 2) return false;
 
             // ВАЖНО: Проверяем что это не жест "все пальцы вместе"
             // При pinch хотя бы некоторые пальцы должны быть открыты
@@ -4134,15 +4183,8 @@
 
         // Определение формы молекулы по комбинации пальцев в пинче
         function getShapeFromPinch(landmarks) {
-            const thumbTip = landmarks[4];
-
             // Расстояния от большого пальца до каждого пальца
-            const distances = {
-                index: Math.sqrt((thumbTip.x - landmarks[8].x) ** 2 + (thumbTip.y - landmarks[8].y) ** 2),
-                middle: Math.sqrt((thumbTip.x - landmarks[12].x) ** 2 + (thumbTip.y - landmarks[12].y) ** 2),
-                ring: Math.sqrt((thumbTip.x - landmarks[16].x) ** 2 + (thumbTip.y - landmarks[16].y) ** 2),
-                pinky: Math.sqrt((thumbTip.x - landmarks[20].x) ** 2 + (thumbTip.y - landmarks[20].y) ** 2)
-            };
+            const distances = pinchDistances(landmarks);
 
             // Порог касания - палец должен быть достаточно близко к большому пальцу
             const touchThreshold = 0.055; // СМЯГЧЕНО для стабильности (было 0.05)
@@ -4564,14 +4606,12 @@
         }
 
         // === ЗАГРУЗКА РАСПОЗНАВАНИЯ ЖЕСТОВ (MediaPipe) ===
-        // Все файлы MediaPipe (JS-обёртки, WASM, модели) лежат на нашем сервере - без CDN.
+        // Основной движок - MediaPipe Tasks Vision в отдельном потоке (см. ниже startWorkerEngine).
+        // Этот блок - запасной движок @mediapipe/hands в основном потоке для браузеров без
+        // Worker/OffscreenCanvas. Все файлы MediaPipe лежат на нашем сервере - без CDN.
         // Большие файлы скачиваются заранее через fetch с подсчётом байтов: пользователь видит
         // реальный прогресс, а MediaPipe потом получает их из памяти (blob URL) без повторной загрузки.
         // Модель лица (режим редактирования ртом) грузится только после рук, чтобы не делить канал.
-        //
-        // Почему не MediaPipe Tasks Vision: замеры (октябрь 2026) показали, что старый движок уже
-        // считает на видеокарте и не медленнее (8.9 мс против 9.5 мс на кадр у Tasks GPU, Tasks CPU -
-        // 31.6 мс), а объём загрузки после brotli почти одинаковый (~9.4 vs ~9.2 МБ). См. ROADMAP.md.
         const MEDIAPIPE_BASE = './mediapipe';
         const HANDS_ASSETS = {
             dir: 'hands',
@@ -4840,6 +4880,7 @@
                 }
 
                 handsDetector = detector;
+                engineKind = 'main-thread';
                 setEngineState('ready');
                 console.log('✅ MediaPipe Hands готов');
 
@@ -4890,12 +4931,181 @@
             }
         }
 
+        // === РАСПОЗНАВАНИЕ В ОТДЕЛЬНОМ ПОТОКЕ (Web Worker + MediaPipe Tasks Vision) ===
+        // Основной вариант. В основном потоке нейросеть блокирует отрисовку: на iPad распознавание
+        // кадра занимает ~50-150 мс, и экран обновлялся всего 5-10 раз в секунду (сглаживание движения
+        // рук не помогало - между распознаваниями просто не было кадров). В воркере (js/vision-worker.js)
+        // основной поток свободен и рисует 60 кадров/с, а результаты приходят по мере готовности.
+        // Если браузер не поддерживает нужное (Worker, OffscreenCanvas, createImageBitmap) или воркер
+        // не запустился - откат на прежний движок @mediapipe/hands в основном потоке (startHandsEngine).
+        const TASKS_BASE = `${MEDIAPIPE_BASE}/tasks`;
+        const TASKS_SIZES = { wasm: 11756954, handModel: 7819105 }; // Для прогресса загрузки
+        let visionWorker = null;
+        let workerHandsReady = false;
+        let workerFaceReady = false;
+        let workerBusy = false;      // Кадр в обработке - следующий не отправляем
+        let workerFrameErrors = 0;
+        let engineKind = '';         // 'worker-GPU' | 'worker-CPU' | 'main-thread' - для диагностики
+
+        function canUseVisionWorker() {
+            return typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined' &&
+                typeof createImageBitmap === 'function' && !/[?&]engine=legacy\b/.test(location.search);
+        }
+
+        function isHandTrackingReady() {
+            return workerHandsReady || !!handsDetector;
+        }
+
+        function absoluteUrl(path) {
+            return new URL(path, location.href).href;
+        }
+
+        function stopVisionWorker() {
+            if (visionWorker) {
+                visionWorker.terminate();
+                visionWorker = null;
+            }
+            workerHandsReady = false;
+            workerFaceReady = false;
+            workerBusy = false;
+        }
+
+        function startGestureEngine() {
+            if (canUseVisionWorker()) {
+                startWorkerEngine();
+            } else {
+                startHandsEngine();
+            }
+        }
+
+        // Откат на распознавание в основном потоке
+        function fallbackToMainThreadEngine(reason) {
+            console.warn('Распознавание в отдельном потоке недоступно, используем основной поток:', reason);
+            stopVisionWorker();
+            startHandsEngine();
+        }
+
+        function startWorkerEngine() {
+            stopVisionWorker();
+            if (engineAbort) engineAbort.abort();
+            engineAbort = null;
+
+            const urls = {
+                bundle: absoluteUrl(`${TASKS_BASE}/vision_bundle_cjs.js`),
+                wasmLoader: absoluteUrl(`${TASKS_BASE}/wasm/vision_wasm_internal.js`),
+                wasmBinary: absoluteUrl(`${TASKS_BASE}/wasm/vision_wasm_internal.wasm`),
+                handModel: absoluteUrl(`${TASKS_BASE}/models/hand_landmarker.task`),
+                faceModel: absoluteUrl(`${TASKS_BASE}/models/face_landmarker.task`),
+                wasmSize: TASKS_SIZES.wasm,
+                handModelSize: TASKS_SIZES.handModel
+            };
+
+            engineProgress = { loaded: 0, total: TASKS_SIZES.wasm + TASKS_SIZES.handModel };
+            engineSlow = false;
+            engineLastProgressTime = performance.now();
+            setEngineState('loading');
+
+            let worker;
+            try {
+                worker = new Worker('js/vision-worker.js');
+            } catch (error) {
+                fallbackToMainThreadEngine(error);
+                return;
+            }
+            visionWorker = worker;
+
+            worker.onmessage = (event) => {
+                if (worker !== visionWorker) return; // Сообщение от уже остановленного воркера
+                const message = event.data;
+                switch (message.type) {
+                    case 'progress':
+                        engineProgress = { loaded: message.loaded, total: message.total };
+                        engineLastProgressTime = performance.now();
+                        engineSlow = false;
+                        renderEngineCard();
+                        break;
+                    case 'hands-ready':
+                        workerHandsReady = true;
+                        engineKind = `worker-${message.delegate}`;
+                        console.log(`✅ Распознавание рук в отдельном потоке (${message.delegate})`);
+                        setEngineState('ready');
+                        // Лицо - после рук, чтобы не делить канал при загрузке
+                        worker.postMessage({ type: 'init-face', urls });
+                        break;
+                    case 'face-ready':
+                        workerFaceReady = true;
+                        console.log(`✅ Распознавание лица в отдельном потоке (${message.delegate})`);
+                        break;
+                    case 'result':
+                        workerBusy = false;
+                        handleWorkerResult(message);
+                        break;
+                    case 'error':
+                        if (message.stage === 'frame') {
+                            workerBusy = false;
+                            workerFrameErrors++;
+                            if (workerFrameErrors <= 5) console.error('❌ Ошибка распознавания кадра:', message.message);
+                        } else if (message.stage === 'init-face') {
+                            console.warn('Распознавание лица не запустилось - режим редактирования ртом недоступен:', message.message);
+                        } else {
+                            fallbackToMainThreadEngine(message.message);
+                        }
+                        break;
+                }
+            };
+
+            // Скрипт воркера не загрузился или упал
+            worker.onerror = (event) => {
+                if (worker !== visionWorker) return;
+                event.preventDefault();
+                if (workerHandsReady) {
+                    workerBusy = false;
+                    console.error('❌ Ошибка в воркере распознавания:', event.message);
+                } else {
+                    fallbackToMainThreadEngine(event.message || 'worker error');
+                }
+            };
+
+            worker.postMessage({ type: 'init-hands', urls });
+        }
+
+        // Результат воркера -> прежние обработчики (тот же формат точек: 21 точка руки, 468+ точек лица)
+        function handleWorkerResult(message) {
+            handsDetectMsAvg = handsDetectMsAvg * 0.9 + message.handsMs * 0.1;
+            onResults({
+                multiHandLandmarks: message.hands.map(hand => hand.landmarks),
+                multiHandedness: message.hands.map(hand => ({ label: hand.label }))
+            });
+            if (message.face !== null) {
+                onFaceResults({ multiFaceLandmarks: message.face.length > 0 ? [message.face] : [] });
+            }
+        }
+
+        // Отправка кадра камеры в воркер. createImageBitmap копирует кадр без блокировки отрисовки,
+        // а передача bitmap в воркер (transfer) - без копирования.
+        function sendFrameToWorker(now) {
+            const worker = visionWorker;
+            workerBusy = true;
+            const wantFace = workerFaceReady && now - lastFaceDetectTime >= FACE_DETECT_INTERVAL_MS;
+            if (wantFace) lastFaceDetectTime = now;
+
+            createImageBitmap(video).then((bitmap) => {
+                if (worker !== visionWorker) {
+                    bitmap.close();
+                    return;
+                }
+                worker.postMessage({ type: 'frame', bitmap, timestamp: now, face: wantFace }, [bitmap]);
+            }).catch(() => {
+                workerBusy = false;
+            });
+        }
+
         // Камера не нужна - не тратим трафик на модели
         function stopGestureEngineDownload() {
-            if (engineAbort && engineState !== 'ready') {
-                engineAbort.abort();
-                engineState = 'idle';
-            }
+            if (engineState === 'ready') return;
+            if (engineAbort) engineAbort.abort();
+            stopVisionWorker();
+            engineState = 'idle';
         }
 
         async function retryGestureSetup() {
@@ -4907,7 +5117,7 @@
                 startDetectionLoop();
             }
             if (engineState !== 'ready') {
-                startHandsEngine();
+                startGestureEngine();
             }
         }
 
@@ -5351,7 +5561,7 @@
             let lines;
             if (editorMode) {
                 lines = ['Draw with the Pencil', `or choose Create and ${action} to add molecules to paint`];
-            } else if (cameraState === 'ok' && handsDetector) {
+            } else if (cameraState === 'ok' && isHandTrackingReady()) {
                 lines = ['Pinch thumb and index finger in front of the camera', `or choose Create and ${action} the canvas`];
             } else {
                 lines = [`Choose Create and ${action} the canvas`, 'to add your first molecule'];
@@ -5397,6 +5607,30 @@
             ctx.restore();
         }
 
+        // Диагностика (?debug в адресе): реальная частота отрисовки и распознавания на устройстве
+        let renderedFrames = 0;
+        if (/[?&]debug\b/.test(location.search)) {
+            const hud = document.getElementById('debugHud');
+            hud.hidden = false;
+            let lastFrames = 0;
+            let lastResults = 0;
+            let lastTime = performance.now();
+            setInterval(() => {
+                const now = performance.now();
+                const seconds = (now - lastTime) / 1000;
+                const renderFps = (renderedFrames - lastFrames) / seconds;
+                const detectFps = (frameCount - lastResults) / seconds;
+                lastFrames = renderedFrames;
+                lastResults = frameCount;
+                lastTime = now;
+                const track = currentStream && currentStream.getVideoTracks()[0];
+                const settings = track && track.getSettings ? track.getSettings() : {};
+                hud.textContent =
+                    `screen ${renderFps.toFixed(0)} fps | hands ${detectFps.toFixed(0)}/s, ${handsDetectMsAvg.toFixed(0)} ms\n` +
+                    `engine ${engineKind || engineState} | camera ${settings.width || '?'}x${settings.height || '?'} | ${currentLayout}`;
+            }, 1000);
+        }
+
         // Основной цикл анимации
         function animate() {
             // Полная очистка canvas в начале каждого кадра
@@ -5413,6 +5647,7 @@
 
             // Плавное положение рук между кадрами распознавания (до всей логики жестов)
             updateHandDisplayPositions(performance.now());
+            renderedFrames++;
 
             // Фиксация с таймером
             const fists = hands.filter(h => h.isFist);
@@ -6077,7 +6312,15 @@
             const hasNewFrame = video.readyState >= video.HAVE_CURRENT_DATA && frameKey !== lastVideoFrameKey;
             const throttled = now - lastDetectTime < getDetectInterval();
 
-            if (handsDetector && hasNewFrame && !throttled && !cameraSwitching) {
+            if (workerHandsReady) {
+                // Воркер: следующий кадр - как только освободится. Распознавание идёт в отдельном
+                // потоке и не задерживает отрисовку, поэтому дополнительный лимит частоты не нужен.
+                if (!workerBusy && hasNewFrame && !cameraSwitching) {
+                    lastVideoFrameKey = frameKey;
+                    lastDetectTime = now;
+                    sendFrameToWorker(now);
+                }
+            } else if (handsDetector && hasNewFrame && !throttled && !cameraSwitching) {
                 lastVideoFrameKey = frameKey;
                 lastDetectTime = now;
                 try {
@@ -8057,7 +8300,7 @@
 
             // Модель жестов, камера и микрофон загружаются параллельно и не блокируют приложение:
             // мышь, касания и редактор работают сразу, прогресс показывает карточка #engineCard
-            startHandsEngine();
+            startGestureEngine();
             const [camera, audio] = await Promise.all([
                 setupCamera(),
                 setupAudio()

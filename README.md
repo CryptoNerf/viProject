@@ -80,14 +80,13 @@
 
 ## Технологии
 
-- **MediaPipe Hands** — распознавание рук и жестов
-- **MediaPipe FaceMesh** — распознавание открытого рта
+- **MediaPipe Tasks Vision** (Hand/Face Landmarker) в **Web Worker** — распознавание рук и открытого рта без задержки отрисовки; запасной вариант для старых браузеров — MediaPipe Hands/FaceMesh в основном потоке
 - **Web Audio API** — анализ звука с микрофона
 - **Canvas 2D** — рендеринг, **marching squares** + SDF-формы — плавные контуры метаболов
 - **MediaRecorder** — запись видео
 - **StPageFlip** — книга-мануал (`manual.html`)
 
-Все файлы MediaPipe лежат локально в `public/mediapipe/`, CDN не используется (см. [MEDIAPIPE-SETUP.md](MEDIAPIPE-SETUP.md)). Пока модель жестов загружается, карточка вверху показывает прогресс; мышь, касания и редактор работают сразу.
+Все файлы MediaPipe лежат локально в `public/mediapipe/`, CDN не используется (см. [MEDIAPIPE-SETUP.md](MEDIAPIPE-SETUP.md)). Диагностика производительности на устройстве: откройте приложение с `?debug` в адресе. Пока модель жестов загружается, карточка вверху показывает прогресс; мышь, касания и редактор работают сразу.
 
 ## Запуск локально
 
@@ -113,7 +112,8 @@ public/
 ├── manual.html           # Книга-мануал по жестам (js/manual-flip.js, css/manual.css)
 ├── service-worker.js     # Офлайн-кеш (PWA)
 ├── manifest.json         # PWA-манифест
-├── mediapipe/            # Локальные WASM и модели MediaPipe (~25 МБ)
+├── js/vision-worker.js   # Распознавание рук и лица в отдельном потоке
+├── mediapipe/            # Локальные WASM и модели MediaPipe (основной и запасной движок)
 ├── icons/, img/, fonts/  # Иконки, иллюстрации мануала, шрифт
 download-mediapipe.sh     # Обновление файлов MediaPipe
 ```

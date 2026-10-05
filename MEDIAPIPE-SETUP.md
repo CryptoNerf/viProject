@@ -1,28 +1,55 @@
-# MediaPipe Локальная Установка
+# MediaPipe: распознавание рук и лица
 
-## Что это?
+Все файлы MediaPipe лежат вместе с сайтом в `public/mediapipe/`, CDN во время работы не используется.
 
-Все файлы MediaPipe — JS-обёртки `hands.js` / `face_mesh.js`, WASM и модели — хостятся вместе с сайтом, CDN во время работы не используется:
+## Два движка
 
-- ✅ **Быстрой загрузки** - нет задержек от CDN
-- ✅ **Надёжности** - работает даже если CDN недоступен
-- ✅ **Совместимости** - работает во всех браузерах без QUIC ошибок
-- ✅ **Нет CORS проблем** - файлы загружаются с того же домена
+| | Основной | Запасной |
+| --- | --- | --- |
+| Библиотека | `@mediapipe/tasks-vision` 1.0.1 | `@mediapipe/hands` 0.4.1675469240, `@mediapipe/face_mesh` 0.4.1633559619 |
+| Где работает | Web Worker (`public/js/vision-worker.js`) | основной поток страницы |
+| Файлы | `public/mediapipe/tasks/` (~24 МБ) | `public/mediapipe/hands/`, `face_mesh/` (~26 МБ) |
+| Когда используется | всегда, если браузер поддерживает Worker, OffscreenCanvas и createImageBitmap | если их нет или воркер не запустился |
+
+Пользователь скачивает только один из движков.
+
+### Почему основной движок работает в воркере
+
+В основном потоке нейросеть блокирует отрисовку страницы. На iPad распознавание кадра занимает ~50–150 мс, и всё это время холст не обновлялся: экран и курсор руки двигались с частотой 5–10 кадров в секунду. В воркере основной поток свободен:
+
+| Замедление CPU (имитация планшета) | Воркер: кадров/с экрана | Основной поток: кадров/с экрана |
+| --- | --- | --- |
+| нет | 60 | 55 |
+| ×4 | 60 | 8,7 |
+| ×6 | 60 | 5,7 |
+
+Старый `@mediapipe/hands` в воркере работать не может (он завязан на DOM страницы), поэтому основной движок — Tasks Vision. Точки руки у обоих движков почти совпадают (для раскрытой руки расхождение ~0,005 при порогах жестов 0,035–0,17), логика жестов общая.
+
+Для проверки запасного движка откройте страницу с `?engine=legacy`.
 
 ## Структура файлов
 
 ```text
-public/                           # Vercel использует эту папку как корень сайта
-├── index.html                    # Главная страница
-└── mediapipe/                    # MediaPipe файлы
-    ├── hands/
+public/
+├── js/vision-worker.js                     # Воркер распознавания (Tasks Vision)
+└── mediapipe/
+    ├── tasks/                              # Основной движок
+    │   ├── vision_bundle_cjs.js            # = vision_bundle.cjs из npm (.js - чтобы importScripts принял MIME-тип)
+    │   ├── wasm/vision_wasm_internal.js
+    │   ├── wasm/vision_wasm_internal.wasm  (11.8 MB)
+    │   └── models/
+    │       ├── hand_landmarker.task        (7.8 MB)
+    │       └── face_landmarker.task        (3.8 MB)
+    ├── hands/                              # Запасной движок: руки
+    │   ├── hands.js
     │   ├── hands_solution_simd_wasm_bin.wasm (6 MB)
     │   ├── hands_solution_simd_wasm_bin.js
     │   ├── hands_solution_packed_assets_loader.js
     │   ├── hands_solution_packed_assets.data (4.3 MB)
     │   ├── hands.binarypb
     │   └── hand_landmark_full.tflite (5.5 MB)
-    └── face_mesh/
+    └── face_mesh/                          # Запасной движок: лицо
+        ├── face_mesh.js
         ├── face_mesh_solution_simd_wasm_bin.wasm (6 MB)
         ├── face_mesh_solution_simd_wasm_bin.js
         ├── face_mesh_solution_packed_assets_loader.js
@@ -30,63 +57,37 @@ public/                           # Vercel использует эту папк�
         └── face_mesh.binarypb
 ```
 
-**Общий размер:** ~26 MB
+## Как это загружается
 
-## Версии
+**Основной движок** (`startWorkerEngine()` в `public/index.html`):
 
-| Пакет | Версия |
-| ----- | ------ |
-| `@mediapipe/hands` | `0.4.1675469240` |
-| `@mediapipe/face_mesh` | `0.4.1633559619` |
+1. страница создаёт воркер `js/vision-worker.js`;
+2. воркер скачивает WASM и модель руки через `fetch` с подсчётом байтов и шлёт прогресс — его показывает карточка загрузки;
+3. создаёт `HandLandmarker` сначала на видеокарте (`GPU`), при ошибке — на процессоре (`CPU`), всё равно в отдельном потоке;
+4. после готовности рук так же загружает `FaceLandmarker` (режим редактирования ртом);
+5. страница отправляет в воркер кадры камеры (`createImageBitmap`, без копирования) и получает точки рук и лица.
 
-JS-обёртка (`hands.js`, `face_mesh.js`) и WASM/модели работают **только в паре одной версии**, поэтому всё лежит рядом в `public/mediapipe/` и скачивается одним скриптом.
+**Запасной движок** (`startHandsEngine()`): подключает `hands.js`, скачивает большие файлы с прогрессом и отдаёт их MediaPipe из памяти (blob URL).
 
-Почему не `@mediapipe/tasks-vision`: см. замеры и решение в [ROADMAP.md](ROADMAP.md), раздел 1.
+При ошибке карточка показывает причину и кнопку Retry. Service Worker кеширует `/mediapipe/*`, поэтому повторные открытия загружают модели мгновенно.
 
 ## Как обновить файлы MediaPipe
 
-1. Поменяйте версии в `download-mediapipe.sh` (`HANDS_VERSION`, `FACE_MESH_VERSION`) и в URL скриптов в `public/index.html`.
+1. Поменяйте версии в `download-mediapipe.sh`.
 2. Запустите:
 
    ```bash
    bash download-mediapipe.sh
    ```
 
-3. Увеличьте `CACHE_NAME` в `public/service-worker.js` — файлы MediaPipe отдаются из кеша без проверки сети, иначе у пользователей останутся старые версии.
+3. Поправьте размеры файлов в `TASKS_SIZES`, `HANDS_ASSETS` и `FACE_ASSETS` в `public/index.html` (по ним считается прогресс загрузки).
+4. Увеличьте `CACHE_NAME` в `public/service-worker.js` — файлы MediaPipe отдаются из кеша без проверки сети, иначе у пользователей останутся старые версии.
 
-## Деплой на Vercel
+## Диагностика
 
-1. Убедитесь что папка `public/` закоммичена в git:
+Откройте приложение с `?debug` в адресе — внизу появится строка с реальной частотой отрисовки экрана, частотой и временем распознавания, типом движка (`worker-GPU`, `worker-CPU` или `main-thread`) и разрешением камеры.
 
-   ```bash
-   git add public/
-   git commit -m "Add local MediaPipe files for faster loading"
-   git push
-   ```
+В консоли браузера при успешном запуске видно:
 
-2. Vercel автоматически задеплоит файлы из `public/` папки
-
-3. Файлы будут доступны по пути:
-   - `https://your-domain.vercel.app/mediapipe/hands/hands_solution_simd_wasm_bin.wasm`
-   - `https://your-domain.vercel.app/mediapipe/face_mesh/face_mesh_solution_simd_wasm_bin.wasm`
-
-## Проверка работы
-
-После деплоя откройте консоль браузера (F12) и проверьте:
-
-1. Должны увидеть: `🎉 onResults вызван первый раз! MediaPipe работает!` и список загруженных файлов
-2. В Network вкладке все файлы `mediapipe/...` должны загружаться с вашего домена
-3. Детекция рук должна работать через 2-5 секунд (не минуты!)
-
-## Как это загружается
-
-`startHandsEngine()` в `public/index.html`:
-
-1. подключает `mediapipe/hands/hands.js`;
-2. скачивает большие файлы (WASM, `.data`, `.tflite`) через `fetch` с подсчётом байтов — отсюда прогресс в карточке;
-3. отдаёт их MediaPipe из памяти через `locateFile` (blob URL), чтобы не качать второй раз;
-4. после готовности рук так же загружает FaceMesh (режим редактирования ртом).
-
-При ошибке карточка показывает причину и кнопку Retry. Service Worker кеширует `/mediapipe/*`, поэтому повторные открытия загружают модели мгновенно.
-
-Размеры файлов для прогресса записаны в `HANDS_ASSETS` / `FACE_ASSETS` — при обновлении MediaPipe их нужно поправить.
+- `✅ Распознавание рук в отдельном потоке (GPU)`
+- `✅ Распознавание лица в отдельном потоке (GPU)`

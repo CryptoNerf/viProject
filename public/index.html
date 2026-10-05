@@ -103,8 +103,7 @@
             top: 20px;
             right: 20px;
             background: #ffffff;
-            padding: 16px;
-            padding-top: 28px;
+            padding: 12px 16px 16px;
             border: 2px solid #000000;
             border-radius: 0;
             box-shadow: 4px 4px 0 rgba(0,0,0,1);
@@ -426,19 +425,6 @@
             font-family: 'SysfontC', monospace;
         }
 
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 24px;
-            color: #000000;
-            text-align: center;
-            z-index: 100;
-            font-family: 'SysfontC', monospace;
-            text-transform: uppercase;
-        }
-
         .gesture-hint {
             position: absolute;
             top: 20px;
@@ -586,6 +572,118 @@
             box-shadow: none;
         }
 
+        /* === ШАПКА ПАНЕЛЕЙ, ГРУППЫ НАСТРОЕК, ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМА === */
+
+        /* Заголовок и кнопка закрытия в одной строке. Раньше крестик был абсолютно спозиционирован:
+           в палитре его перекрывала полоса "Drag to move", на планшете он наезжал на заголовок. */
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            background: #ffffff;
+            user-select: none;
+        }
+
+        .panel-title {
+            flex: 1;
+            margin: 0;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-family: 'SysfontC', monospace;
+        }
+
+        .panel-header .close-panel {
+            position: static;
+            margin: 0;
+        }
+
+        .panel-drag-hint {
+            font-size: 12px;
+            color: #555555;
+            text-transform: uppercase;
+        }
+
+        #paletteHandle {
+            cursor: move;
+        }
+
+        .panel-group-title {
+            margin: 14px 0 6px;
+            padding-top: 8px;
+            border-top: 2px solid #000000;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .panel-header + .panel-group-title {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        /* Несколько кнопок в строку (Lock / Unlock / Clear, экспорт) */
+        .button-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .button-row button {
+            flex: 1;
+            margin-top: 0;
+            padding-left: 6px;
+            padding-right: 6px;
+        }
+
+        /* Переключатель режима "Gestures | Editor" вверху по центру */
+        #modeSwitch {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            background: #ffffff;
+            border: 2px solid #000000;
+            box-shadow: 4px 4px 0 #000000;
+            z-index: 16;
+        }
+
+        .mode-option {
+            width: auto;
+            margin: 0;
+            padding: 6px 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: none;
+            box-shadow: none;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .mode-option + .mode-option {
+            border-left: 2px solid #000000;
+        }
+
+        .mode-option svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
+        }
+
+        .mode-option.active,
+        .mode-option.active:hover {
+            background: #000000;
+            color: #ffffff;
+        }
+
         /* === PAINT РЕЖИМ РЕДАКТОРА === */
 
         /* Палитра цветов внизу (как в Paint) */
@@ -597,8 +695,7 @@
             background: #ffffff;
             border: 2px solid #000000;
             box-shadow: 4px 4px 0 #000000;
-            padding: 10px;
-            padding-top: 25px;
+            padding: 10px 12px 12px;
             display: none;
             z-index: 15;
             pointer-events: none; /* Панель прозрачна для событий мыши - можно рисовать сквозь неё */
@@ -616,37 +713,13 @@
         #colorPalette button,
         #colorPalette input,
         #colorPalette .color-swatch,
-        #colorPalette .color-box,
+        #colorPalette .panel-header,
         #colorPalette label {
             pointer-events: auto;
         }
 
         #bgClearBtn {
             margin-top: 0px;
-        }
-
-        #paletteHandle {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 20px;
-            background: #ffffff;
-            border-bottom: 2px solid #000000;
-            cursor: move;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            color: #000000;
-            user-select: none;
-            pointer-events: auto;
-            font-family: 'SysfontC', monospace;
-            text-transform: uppercase;
-        }
-
-        #paletteHandle:hover {
-            background: #dddddd;
         }
 
         #colorPalette .label-paint {
@@ -680,65 +753,23 @@
             border: 4px solid #000000;
         }
 
-        #currentColorDisplay {
+        /* Текущий цвет = поле выбора произвольного цвета (раньше это были две отдельные секции) */
+        .current-color {
             display: flex;
-            gap: 5px;
-            margin-top: 5px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            cursor: pointer;
+            font-size: 13px;
         }
 
-        .color-box {
-            width: 32px;
+        .current-color input[type="color"] {
+            width: 56px;
             height: 32px;
+            padding: 0;
             border: 2px solid #000000;
-        }
-
-        .color-label {
-            font-size: 14px;
-            text-align: center;
-            margin-top: 2px;
-            color: #000000;
-            font-family: 'SysfontC', monospace;
-            text-transform: uppercase;
-        }
-
-        /* Кнопка переключения режима - наследует стили от обычных кнопок */
-        #modeToggleBtn {
-            margin-top: 15px;
-        }
-
-        /* Индикатор текущего режима */
-        .mode-indicator {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 8px 20px;
-            background: #ffffff;
-            border: 2px solid #000000;
-            box-shadow: 4px 4px 0 #000000;
-            font-size: 16px;
-            font-weight: bold;
-            z-index: 16;
-            display: none;
-            font-family: 'SysfontC', monospace;
-            color: #000000;
-            text-transform: uppercase;
-        }
-
-        .mode-indicator.active {
-            display: block;
-        }
-
-        .mode-indicator.gesture-mode {
-            background: #ffffff;
-            color: #000000;
-            border: 2px solid #000000;
-        }
-
-        .mode-indicator.editor-mode {
-            background: #ffffff;
-            color: #000000;
-            border: 2px solid #000000;
+            cursor: pointer;
+            flex-shrink: 0;
         }
 
         /* Кнопки режима заливки */
@@ -792,111 +823,82 @@
             pointer-events: none;
         }
 
-        .toolbox-section {
-            margin-bottom: 15px;
+        /* Группы кнопок разделены линией (заголовки секций убраны: под каждой кнопкой теперь подпись) */
+        .toolbox-section + .toolbox-section {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 2px solid #000000;
         }
 
-        .toolbox-section:last-child {
-            margin-bottom: 0;
-        }
-
-        .toolbox-title {
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #000000;
-            text-align: center;
-            padding: 4px;
-            background: #ffffff;
-            border: 2px solid #000000;
-            text-transform: uppercase;
-        }
-
-        .tool-grid {
+        .tool-grid,
+        .action-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(2, 64px);
             gap: 6px;
         }
 
-        .tool-btn {
-            width: 60px;
-            height: 60px;
-            padding: 4px;
+        .tool-btn,
+        .action-btn {
+            width: 64px;
+            height: 66px;
+            padding: 4px 2px 3px;
             margin: 0;
             background: #ffffff;
+            color: #000000;
             border: 2px solid #000000;
             cursor: pointer;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            gap: 2px;
             transition: none;
             box-shadow: 2px 2px 0 #000000;
         }
 
-        .tool-btn:hover {
-            background: #dddddd;
-        }
-
-        .tool-btn:active, .tool-btn.active {
-            background: #000000;
-            color: #ffffff;
-            box-shadow: none;
-        }
-
-        .tool-label {
-            display: none; /* Скрываем подписи */
-        }
-
-        .tool-icon {
-            width: 48px; /* Увеличен размер */
-            height: 48px;
-            object-fit: contain;
-            pointer-events: none; /* Чтобы клики проходили на кнопку */
-        }
-
-        .action-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 4px;
-        }
-
-        .action-btn {
-            width: 100%;
-            padding: 10px 4px;
-            margin: 0;
-            font-size: 20px;
-            background: #ffffff;
-            border: 2px solid #000000;
-            cursor: pointer;
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 2px 2px 0 #000000;
-        }
-
+        .tool-btn:hover,
         .action-btn:hover {
             background: #dddddd;
         }
 
+        .tool-btn:active, .tool-btn.active,
         .action-btn:active {
             background: #000000;
             color: #ffffff;
             box-shadow: none;
         }
 
-        .action-btn:disabled {
-            color: #808080;
+        /* Неактивная кнопка (нечего отменять, не выбрана молекула) - заметно бледнее */
+        .action-btn:disabled,
+        .action-btn:disabled:hover {
+            background: #ffffff;
+            color: #000000;
             cursor: not-allowed;
-            opacity: 0.6;
+            opacity: 0.35;
+            box-shadow: 2px 2px 0 #000000;
+        }
+
+        /* Подпись под иконкой: иконки нарисованы от руки и без подписи не всегда понятны */
+        .tool-label {
+            display: block;
+            font-size: 10px;
+            line-height: 1;
+            text-transform: uppercase;
+            pointer-events: none;
+        }
+
+        .tool-icon {
+            width: 38px;
+            height: 38px;
+            object-fit: contain;
+            pointer-events: none; /* Чтобы клики проходили на кнопку */
         }
 
         .action-btn img {
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 30px;
             object-fit: contain;
+            pointer-events: none;
         }
 
         /* =====================================================================
@@ -962,6 +964,171 @@
             grid-template-columns: repeat(auto-fill, 20px);
         }
 
+        /* Над нижней строкой (статус и индикатор звука), иначе палитра закрывала подсказки статуса */
+        [data-layout="desktop"] #colorPalette {
+            bottom: 60px;
+        }
+
+        [data-layout="desktop"] #colorPalette .panel-header {
+            grid-column: 1 / -1;
+            margin: 0 0 8px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #000000;
+        }
+
+        /* === Карточка загрузки жестов, подсказки, кнопка смены камеры === */
+        #engineCard {
+            position: absolute;
+            top: 72px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(340px, calc(100vw - 24px));
+            padding: 12px 44px 12px 14px;
+            background: #ffffff;
+            border: 2px solid #000000;
+            box-shadow: 4px 4px 0 #000000;
+            z-index: 25;
+            font-family: 'SysfontC', monospace;
+        }
+
+        #engineCard .close-panel {
+            top: 8px;
+            right: 8px;
+        }
+
+        .engine-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .engine-message {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .engine-note {
+            font-size: 12px;
+            line-height: 1.4;
+            margin-top: 6px;
+        }
+
+        .engine-note:empty {
+            display: none;
+        }
+
+        .engine-progress {
+            height: 12px;
+            margin-top: 8px;
+            border: 2px solid #000000;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        .engine-progress-bar {
+            height: 100%;
+            width: 0;
+            background: #000000;
+            transition: width 0.2s;
+        }
+
+        /* Неизвестная длительность (запуск движка) - бегущая полоска */
+        .engine-progress.indeterminate .engine-progress-bar {
+            width: 30%;
+            animation: engine-indeterminate 1.2s linear infinite;
+        }
+
+        @keyframes engine-indeterminate {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(340%); }
+        }
+
+        #engineRetry {
+            width: auto;
+            margin-top: 10px;
+            padding: 6px 16px;
+        }
+
+        #hintToast {
+            position: absolute;
+            left: 50%;
+            bottom: 64px;
+            transform: translateX(-50%);
+            width: min(440px, calc(100vw - 24px));
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 12px 14px;
+            background: #000000;
+            color: #ffffff;
+            border: 2px solid #000000;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.25);
+            font-family: 'SysfontC', monospace;
+            font-size: 14px;
+            line-height: 1.45;
+            z-index: 26;
+        }
+
+        #hintText {
+            flex: 1;
+        }
+
+        #hintClose {
+            width: auto;
+            flex-shrink: 0;
+            margin: 0;
+            padding: 4px 10px;
+            background: #ffffff;
+            color: #000000;
+            box-shadow: none;
+        }
+
+        #toggleCamera {
+            top: 20px;
+            left: 64px;
+            padding: 0;
+            margin: 0;
+        }
+
+        #toggleCamera svg {
+            width: 22px;
+            height: 22px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
+        }
+
+        #toggleCamera:disabled {
+            opacity: 0.5;
+            cursor: progress;
+        }
+
+        [data-layout="phone"] #engineCard {
+            top: calc(64px + env(safe-area-inset-top));
+        }
+
+        [data-layout="phone"] #hintToast {
+            bottom: calc(var(--toolbar-h) + 44px);
+        }
+
+        [data-layout="tablet"] #hintToast {
+            bottom: calc(70px + env(safe-area-inset-bottom));
+        }
+
+        [data-layout="phone"] #toggleCamera {
+            top: calc(10px + env(safe-area-inset-top));
+            left: calc(62px + env(safe-area-inset-left));
+        }
+
+        [data-layout="tablet"] #toggleCamera {
+            top: calc(16px + env(safe-area-inset-top));
+            left: calc(72px + env(safe-area-inset-left));
+        }
+
         /* ---------- Общее для телефона и планшета ---------- */
 
         [data-layout="phone"] #container,
@@ -970,9 +1137,31 @@
             height: 100dvh; /* Без учёта выезжающей адресной строки мобильных браузеров */
         }
 
+        /* Перетаскивание палитры - только на десктопе */
+        [data-layout="phone"] .panel-drag-hint,
+        [data-layout="tablet"] .panel-drag-hint {
+            display: none;
+        }
+
         [data-layout="phone"] #paletteHandle,
         [data-layout="tablet"] #paletteHandle {
-            display: none; /* Перетаскивание палитры - только на десктопе */
+            cursor: default;
+        }
+
+        /* Шапка выезжающей панели прилипает к верху при прокрутке: крестик всегда под рукой */
+        [data-layout="phone"] .panel-header,
+        [data-layout="tablet"] .panel-header {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            margin: 0 0 8px;
+            padding: 10px 0 8px;
+            border-bottom: 2px solid #000000;
+        }
+
+        [data-layout="phone"] .panel-header + .panel-group-title,
+        [data-layout="tablet"] .panel-header + .panel-group-title {
+            margin-top: 10px;
         }
 
         /* Панели настроек и палитры - выезжающие листы, управляемые классами
@@ -1115,20 +1304,34 @@
             pointer-events: auto;
         }
 
-        /* Индикатор режима не нужен: режим показывает кнопка на нижней панели */
-        [data-layout="phone"] .mode-indicator {
-            display: none !important;
+        /* Переключатель режима - компактно сверху по центру */
+        [data-layout="phone"] #modeSwitch {
+            top: calc(10px + env(safe-area-inset-top));
+            box-shadow: 2px 2px 0 #000000;
         }
 
-        /* Индикатор звука - компактно сверху по центру */
+        [data-layout="phone"] .mode-option {
+            height: 40px;
+            padding: 0 9px;
+            font-size: 12px;
+            gap: 4px;
+        }
+
+        [data-layout="phone"] .mode-option svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* На узком телефоне подписи режимов не помещаются рядом с кнопками "?" и камеры */
+        @media (max-width: 380px) {
+            [data-layout="phone"] .mode-option span {
+                display: none;
+            }
+        }
+
+        /* Индикатор звука на телефоне скрыт: место сверху по центру занимает переключатель режима */
         [data-layout="phone"] .audio-indicator {
-            top: calc(18px + env(safe-area-inset-top));
-            bottom: auto;
-            left: 50%;
-            right: auto;
-            transform: translateX(-50%);
-            width: 84px;
-            height: 28px;
+            display: none;
         }
 
         /* Строка статуса - над нижней панелью */
@@ -1137,12 +1340,12 @@
             right: auto;
             transform: translateX(-50%);
             bottom: calc(var(--toolbar-h) + 8px);
+            width: max-content;
             max-width: calc(100vw - 24px);
             padding: 4px 10px;
             font-size: 12px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            line-height: 1.35;
+            text-align: center;
             box-shadow: 2px 2px 0 #000000;
         }
 
@@ -1179,6 +1382,8 @@
             justify-content: center;
             gap: 4px;
             overflow-x: hidden;
+            padding-left: calc(4px + env(safe-area-inset-left));
+            padding-right: calc(4px + env(safe-area-inset-right));
         }
 
         [data-layout="phone"][data-orientation="portrait"] .toolbox-section:not([hidden]),
@@ -1187,10 +1392,11 @@
             display: contents;
         }
 
+        /* 42px: в режиме жестов все 8 кнопок помещаются в одну строку даже на экране 360px */
         [data-layout="phone"][data-orientation="portrait"] .tool-btn,
         [data-layout="phone"][data-orientation="portrait"] .action-btn {
-            width: 44px;
-            height: 44px;
+            width: 42px;
+            height: 42px;
             order: 2;
         }
 
@@ -1199,8 +1405,7 @@
         [data-layout="phone"][data-orientation="portrait"] #action-unlock { order: 3; }
         [data-layout="phone"][data-orientation="portrait"] #action-undo,
         [data-layout="phone"][data-orientation="portrait"] #action-redo { order: 4; }
-        [data-layout="phone"][data-orientation="portrait"] #action-mode,
-        [data-layout="phone"][data-orientation="portrait"] #action-palette { order: 5; }
+        [data-layout="phone"][data-orientation="portrait"] #action-palette { order: 1; }
 
         [data-layout="phone"][data-orientation="portrait"] .tool-icon {
             width: 36px;
@@ -1219,14 +1424,14 @@
             z-index: 35;
         }
 
-        /* У боковых панелей (телефон горизонтально, планшет) крестик слева: справа сверху - кнопка ≡ */
-        [data-layout="phone"][data-orientation="landscape"] #controls .close-panel,
-        [data-layout="phone"][data-orientation="landscape"] #colorPalette .close-panel,
-        [data-layout="tablet"] #controls .close-panel,
-        [data-layout="tablet"] #colorPalette .close-panel {
-            left: 16px;
-            right: auto;
+        /* Боковая панель справа (планшет, телефон горизонтально) занимает угол кнопки ≡:
+           прячем ≡, пока панель открыта - иначе она ложилась поверх крестика панели */
+        [data-layout="tablet"].side-panel-open #toggleControls,
+        [data-layout="phone"][data-orientation="landscape"].side-panel-open #toggleControls {
+            opacity: 0;
+            pointer-events: none;
         }
+
 
         [data-layout="phone"] .toolbox-section {
             display: flex;
@@ -1241,8 +1446,20 @@
             padding-right: 0;
         }
 
-        [data-layout="phone"] .toolbox-title {
+        [data-layout="phone"] .toolbox-section + .toolbox-section {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        /* На телефоне подписи не помещаются: что делает инструмент, пишет строка статуса */
+        [data-layout="phone"] .tool-label {
             display: none;
+        }
+
+        [data-layout="phone"] .tool-btn,
+        [data-layout="phone"] .action-btn {
+            gap: 0;
         }
 
         [data-layout="phone"] .tool-grid,
@@ -1281,7 +1498,7 @@
             width: auto;
             max-height: 58vh;
             max-height: 58dvh;
-            padding: 54px calc(16px + env(safe-area-inset-right)) 16px calc(16px + env(safe-area-inset-left));
+            padding: 0 calc(16px + env(safe-area-inset-right)) 16px calc(16px + env(safe-area-inset-left));
             border-width: 2px 0 0 0;
             box-shadow: 0 -4px 0 rgba(0, 0, 0, 0.15);
             transform: none;
@@ -1299,7 +1516,7 @@
             left: auto;
             width: min(380px, 55vw);
             max-height: none;
-            padding-top: calc(54px + env(safe-area-inset-top));
+            padding-top: env(safe-area-inset-top);
             border-width: 0 0 0 2px;
             box-shadow: -4px 0 0 rgba(0, 0, 0, 0.15);
         }
@@ -1309,13 +1526,7 @@
             transform: translateX(calc(100% + 20px));
         }
 
-        [data-layout="phone"] #controls .close-panel,
-        [data-layout="phone"] #colorPalette .close-panel {
-            top: 6px;
-            right: calc(10px + env(safe-area-inset-right));
-        }
-
-        [data-layout="phone"] h2 {
+        [data-layout="phone"] .panel-title {
             font-size: 18px;
         }
 
@@ -1337,8 +1548,14 @@
             right: calc(16px + env(safe-area-inset-right));
         }
 
-        [data-layout="tablet"] .mode-indicator {
-            top: calc(20px + env(safe-area-inset-top));
+        [data-layout="tablet"] #modeSwitch {
+            top: calc(16px + env(safe-area-inset-top));
+        }
+
+        [data-layout="tablet"] .mode-option {
+            height: 44px;
+            padding: 0 16px;
+            font-size: 15px;
         }
 
         [data-layout="tablet"] #status {
@@ -1362,25 +1579,30 @@
 
         [data-layout="tablet"] .tool-grid,
         [data-layout="tablet"] .action-grid {
+            grid-template-columns: repeat(2, 76px);
             gap: 8px;
         }
 
         [data-layout="tablet"] .tool-btn,
         [data-layout="tablet"] .action-btn {
-            width: 64px;
-            height: 64px;
+            width: 76px;
+            height: 78px;
             padding: 4px;
         }
 
         [data-layout="tablet"] .tool-icon {
-            width: 52px;
-            height: 52px;
+            width: 46px;
+            height: 46px;
         }
 
         [data-layout="tablet"] .action-btn img,
         [data-layout="tablet"] .action-btn svg {
-            width: 36px;
-            height: 36px;
+            width: 34px;
+            height: 34px;
+        }
+
+        [data-layout="tablet"] .tool-label {
+            font-size: 11px;
         }
 
         /* Настройки и палитра - боковые панели справа во всю высоту */
@@ -1393,7 +1615,7 @@
             width: 360px;
             max-width: 45vw;
             max-height: none;
-            padding: calc(52px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) 20px;
+            padding: env(safe-area-inset-top) calc(20px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) 20px;
             border-width: 0 0 0 2px;
             box-shadow: -4px 0 0 rgba(0, 0, 0, 0.15);
             transform: none;
@@ -1403,12 +1625,6 @@
         [data-layout="tablet"] #controls.minimized {
             transform: translateX(calc(100% + 20px));
         }
-
-        [data-layout="tablet"] #controls .close-panel,
-        [data-layout="tablet"] #colorPalette .close-panel {
-            top: calc(8px + env(safe-area-inset-top));
-            right: calc(12px + env(safe-area-inset-right));
-        }
     </style>
 </head>
 <body>
@@ -1417,91 +1633,89 @@
         <canvas id="canvas"></canvas>
 
         <div class="toggle-btn" id="toggleHints" title="Open manual book">?</div>
+        <button class="toggle-btn visible" id="toggleCamera" title="Switch camera" aria-label="Switch camera" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/><path d="M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5"/><circle cx="12" cy="12" r="3"/><path d="m18 22-3-3 3-3"/><path d="m6 2 3 3-3 3"/></svg>
+        </button>
 
         <!-- Toolbox -->
         <div id="toolbox">
-            <!-- Tools -->
-            <div class="toolbox-section">
-                <div class="toolbox-title">Tools</div>
+            <!-- Инструменты молекул (работают в обоих режимах) -->
+            <div class="toolbox-section" role="group" aria-label="Tools">
                 <div class="tool-grid">
-                    <button class="tool-btn active" id="tool-select" title="Select molecule: mouse = move, Ctrl+mouse = size, Shift+mouse = stretch, Alt+mouse = rotate, wheel = size. Ctrl+C/V to copy">
-                        <img src="icons/select.png" alt="Select" class="tool-icon">
-                        <div class="tool-label">Select</div>
+                    <button class="tool-btn active" id="tool-select" title="Select: drag a molecule to move it. Ctrl/Cmd+drag = size, Shift = stretch, Alt = rotate, wheel = size, Ctrl+C/V = copy">
+                        <img src="icons/select.png" alt="" class="tool-icon">
+                        <span class="tool-label">Select</span>
                     </button>
-                    <button class="tool-btn" id="tool-create" title="Create molecule (click anywhere)">
-                        <img src="icons/create.png" alt="Create" class="tool-icon">
-                        <div class="tool-label">Create</div>
+                    <button class="tool-btn" id="tool-create" title="Create: click or tap the canvas to add a molecule">
+                        <img src="icons/create.png" alt="" class="tool-icon">
+                        <span class="tool-label">Create</span>
                     </button>
-                    <button class="tool-btn" id="tool-delete" title="Delete molecule (click on molecule)">
-                        <img src="icons/delete.png" alt="Delete" class="tool-icon">
-                        <div class="tool-label">Delete</div>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Selected molecule actions -->
-            <div class="toolbox-section">
-                <div class="toolbox-title">Selected</div>
-                <div class="action-grid">
-                    <button class="action-btn" id="action-lock" title="Lock selected molecule">
-                        <img src="icons/lock.png" alt="Lock">
-                    </button>
-                    <button class="action-btn" id="action-unlock" title="Unlock selected molecule">
-                        <img src="icons/unlock.png" alt="Unlock">
+                    <button class="tool-btn" id="tool-delete" title="Delete: click or tap a molecule to remove it">
+                        <img src="icons/delete.png" alt="" class="tool-icon">
+                        <span class="tool-label">Delete</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Edit: undo/redo, mode switch, palette -->
-            <div class="toolbox-section">
-                <div class="toolbox-title">Edit</div>
+            <!-- Действия с выбранной молекулой и история -->
+            <div class="toolbox-section" role="group" aria-label="Selected molecule and history">
                 <div class="action-grid">
-                    <button class="action-btn" id="action-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+                    <button class="action-btn" id="action-lock" title="Lock the selected molecule (it stops moving and changing shape)" disabled>
+                        <img src="icons/lock.png" alt="">
+                        <span class="tool-label">Lock</span>
+                    </button>
+                    <button class="action-btn" id="action-unlock" title="Unlock the selected molecule" disabled>
+                        <img src="icons/unlock.png" alt="">
+                        <span class="tool-label">Unlock</span>
+                    </button>
+                    <button class="action-btn" id="action-undo" title="Undo (Ctrl/Cmd+Z)" disabled>
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+                        <span class="tool-label">Undo</span>
                     </button>
-                    <button class="action-btn" id="action-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>
+                    <button class="action-btn" id="action-redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
-                    </button>
-                    <button class="action-btn" id="action-mode" title="Editor mode (paint)" aria-label="Editor mode" aria-pressed="false">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4.5-1L20 7.5 16.5 4 5 15.5z"/><path d="m14 6.5 3.5 3.5"/></svg>
-                    </button>
-                    <button class="action-btn" id="action-palette" title="Colors and effects" aria-label="Palette" hidden>
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2s-1-1.6-1-2.5 1-1.5 2-1.5h2a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="15" cy="7" r="1.2"/></svg>
+                        <span class="tool-label">Redo</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Paint tools -->
-            <div class="toolbox-section" id="paintToolsSection" hidden>
-                <div class="toolbox-title">Paint</div>
+            <!-- Инструменты рисования (только в режиме редактора) -->
+            <div class="toolbox-section" id="paintToolsSection" role="group" aria-label="Paint" hidden>
                 <div class="tool-grid">
-                    <button class="tool-btn paint-tool-btn" data-tool="fill" title="Fill molecule with color">
-                        <img src="icons/fill.png" alt="Fill" class="tool-icon">
-                        <div class="tool-label">Fill</div>
+                    <button class="tool-btn paint-tool-btn" data-tool="fill" title="Fill: tap a molecule or a closed pencil shape">
+                        <img src="icons/fill.png" alt="" class="tool-icon">
+                        <span class="tool-label">Fill</span>
                     </button>
-                    <button class="tool-btn paint-tool-btn" data-tool="pencil" title="Draw with pencil">
-                        <img src="icons/pencil.png" alt="Pencil" class="tool-icon">
-                        <div class="tool-label">Pencil</div>
+                    <button class="tool-btn paint-tool-btn" data-tool="pencil" title="Pencil: draw on the canvas">
+                        <img src="icons/pencil.png" alt="" class="tool-icon">
+                        <span class="tool-label">Pencil</span>
                     </button>
-                    <button class="tool-btn paint-tool-btn" data-tool="eraser" title="Erase drawing">
-                        <img src="icons/eraser.png" alt="Eraser" class="tool-icon">
-                        <div class="tool-label">Eraser</div>
+                    <button class="tool-btn paint-tool-btn" data-tool="eraser" title="Eraser: erase strokes and fills">
+                        <img src="icons/eraser.png" alt="" class="tool-icon">
+                        <span class="tool-label">Eraser</span>
+                    </button>
+                    <button class="action-btn" id="action-palette" title="Colors and effects" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2s-1-1.6-1-2.5 1-1.5 2-1.5h2a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="15" cy="7" r="1.2"/></svg>
+                        <span class="tool-label">Colors</span>
                     </button>
                 </div>
             </div>
         </div>
 
         <div id="controls">
-            <button class="close-panel" id="closeControls" title="Hide panel">×</button>
-            <h2>Settings</h2>
+            <div class="panel-header">
+                <h2 class="panel-title">Settings</h2>
+                <button class="close-panel" id="closeControls" title="Hide settings" aria-label="Close settings">×</button>
+            </div>
 
+            <div class="panel-group-title">New molecules</div>
             <div class="control-group">
-                <label for="molSizeSlider">Molecule size: <span class="value-display" id="molSize">150</span></label>
+                <label for="molSizeSlider">Size: <span class="value-display" id="molSize">150</span></label>
                 <input type="range" id="molSizeSlider" min="30" max="300" value="150" step="10">
             </div>
 
             <div class="control-group">
-                <label>Molecule shape:</label>
+                <label>Shape (also changes the selected molecule):</label>
                 <select id="shapeSelector" style="display: none;">
                     <option value="circle">● Circle</option>
                     <option value="triangle">▲ Triangle</option>
@@ -1519,13 +1733,14 @@
                 </div>
             </div>
 
+            <div class="panel-group-title">Behaviour</div>
             <div class="control-group">
                 <label for="mergeSlider">Merge strength: <span class="value-display" id="mergeStrength">1.5</span></label>
                 <input type="range" id="mergeSlider" min="0.5" max="3" value="1.5" step="0.1">
             </div>
 
             <div class="control-group">
-                <label for="audioSensSlider">Audio reaction: <span class="value-display" id="audioSens">20</span></label>
+                <label for="audioSensSlider">Sound reaction: <span class="value-display" id="audioSens">20</span></label>
                 <input type="range" id="audioSensSlider" min="5" max="50" value="20" step="5">
             </div>
 
@@ -1536,23 +1751,24 @@
 
             <div class="checkbox-group">
                 <input type="checkbox" id="showVideo">
-                <label for="showVideo">Show video</label>
+                <label for="showVideo">Show camera video</label>
             </div>
 
-            <button id="lockBtn">Lock all</button>
-            <button id="unlockBtn">Unlock all</button>
-            <button id="clearBtn">Clear all</button>
-            <button id="modeToggleBtn">Editor mode</button>
+            <div class="panel-group-title">All molecules</div>
+            <div class="button-row">
+                <button id="lockBtn" title="Lock all molecules">Lock</button>
+                <button id="unlockBtn" title="Unlock all molecules">Unlock</button>
+                <button id="clearBtn" title="Delete all molecules (Ctrl+Z to undo)">Clear</button>
+            </div>
 
-            <h3 style="margin-top: 15px; margin-bottom: 8px; font-size: 16px; border-top: 2px solid #000000; padding-top: 10px; text-transform: uppercase;">Export</h3>
-
+            <div class="panel-group-title">Export</div>
             <div class="checkbox-group">
                 <input type="checkbox" id="exportWithBackground" checked>
                 <label for="exportWithBackground">With background</label>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
-                <button id="exportPngBtn">Export PNG</button>
+            <div class="button-row">
+                <button id="exportPngBtn">PNG image</button>
                 <button id="recordVideoBtn">
                     <span id="recordBtnText">Record video (30 sec)</span>
                 </button>
@@ -1566,40 +1782,52 @@
         </div>
 
         <div id="status">Loading...</div>
-        <div class="loading" id="loading">
-            <div>Initializing...</div>
-            <div style="font-size: 14px; margin-top: 10px;">Allow camera and microphone access</div>
+
+        <!-- Состояние камеры и загрузки распознавания жестов (не блокирует работу мышью/касаниями) -->
+        <div id="engineCard" role="status" aria-live="polite" hidden>
+            <button class="close-panel" id="engineCardClose" title="Hide" aria-label="Hide">×</button>
+            <div class="engine-title" id="engineTitle">Gestures</div>
+            <div class="engine-message" id="engineMessage"></div>
+            <div class="engine-progress" id="engineProgress" hidden><div class="engine-progress-bar" id="engineProgressBar"></div></div>
+            <div class="engine-note" id="engineNote"></div>
+            <button id="engineRetry" hidden>Retry</button>
         </div>
 
-        <!-- Mode indicator -->
-        <div class="mode-indicator gesture-mode active" id="modeIndicator">
-            Gesture mode
+        <!-- Подсказки для новых пользователей -->
+        <div id="hintToast" role="status" aria-live="polite" hidden>
+            <div id="hintText"></div>
+            <button id="hintClose">Got it</button>
+        </div>
+
+        <!-- Переключатель режима: раньше здесь был индикатор, похожий на кнопку, но не нажимавшийся -->
+        <div id="modeSwitch" role="group" aria-label="Mode">
+            <button class="mode-option active" data-mode="gesture" aria-pressed="true" title="Gesture mode: create and move molecules with hands, mouse or touch">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.3l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></svg>
+                <span>Gestures</span>
+            </button>
+            <button class="mode-option" data-mode="editor" aria-pressed="false" title="Editor mode: fill, draw and erase">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.6 17.9-10.7-2.9"/><path d="M18.4 2.6a1 1 0 1 1 3 3l-4 4a.5.5 0 0 0 0 .7l.9.9a2.4 2.4 0 0 1 0 3.4l-.9.9a.5.5 0 0 1-.7 0L8.4 7.3a.5.5 0 0 1 0-.7l.9-.9a2.4 2.4 0 0 1 3.4 0l.9.9a.5.5 0 0 0 .7 0z"/><path d="M9 8c-1.8 2.7-4 3.5-6.6 3.9a.5.5 0 0 0-.3.8l7.3 8.9a1 1 0 0 0 1.6 0C13.7 19.6 14.8 17.4 15 15"/></svg>
+                <span>Editor</span>
+            </button>
         </div>
 
         <!-- Paint color palette -->
         <div id="colorPalette">
-            <button class="close-panel" id="closePalette" title="Hide palette">×</button>
-            <div id="paletteHandle">⋮⋮ Drag to move ⋮⋮</div>
-            <div class="color-section">
-                <div class="label-paint">Colors:</div>
+            <div class="panel-header" id="paletteHandle">
+                <span class="panel-title">Colors</span>
+                <span class="panel-drag-hint" aria-hidden="true">⋮⋮ drag to move</span>
+                <button class="close-panel" id="closePalette" title="Hide palette" aria-label="Close palette">×</button>
+            </div>
+            <!-- data-tools: при каких инструментах рисования показывать секцию (без инструмента - все) -->
+            <div class="color-section" data-tools="fill pencil">
+                <div class="label-paint">Color:</div>
                 <div id="colorGrid"></div>
+                <label class="current-color" title="Pick any color">
+                    <input type="color" id="customPrimaryColor" value="#000000">
+                    <span>Current color - click to pick any</span>
+                </label>
             </div>
-            <div class="color-section">
-                <div class="label-paint">Current color:</div>
-                <div id="currentColorDisplay">
-                    <div>
-                        <div class="color-box" id="primaryColor" style="background: #000000;"></div>
-                        <div class="color-label">For molecules</div>
-                    </div>
-                </div>
-            </div>
-            <div class="color-section">
-                <div class="label-paint">Custom molecule color:</div>
-                <div style="margin-top: 5px;">
-                    <input type="color" id="customPrimaryColor" value="#000000" style="width: 100%; height: 35px; border: 2px solid #000000; cursor: pointer;" title="Choose custom color for filling molecules">
-                </div>
-            </div>
-            <div class="color-section">
+            <div class="color-section" data-tools="fill eraser">
                 <div class="label-paint" id="fillModeLabel">Fill mode:</div>
                 <div style="display: flex; gap: 5px; margin-top: 5px;">
                     <button class="fill-mode-btn active" data-mode="both" title="Both">Both</button>
@@ -1607,7 +1835,7 @@
                     <button class="fill-mode-btn" data-mode="edge" title="Edge only">Edge</button>
                 </div>
             </div>
-            <div class="color-section">
+            <div class="color-section" data-tools="fill">
                 <div class="label-paint">Effects:</div>
                 <div style="margin-top: 5px; display: flex; flex-direction: column; gap: 3px;">
                     <label style="display: flex; align-items: center; gap: 5px; font-size: 14px; cursor: pointer;">
@@ -1638,7 +1866,7 @@
                     </div>
                 </div>
             </div>
-            <div class="color-section">
+            <div class="color-section" data-tools="pencil eraser">
                 <div class="label-paint" id="pencilToolLabel">Pencil:</div>
                 <div style="margin-top: 5px; display: flex; flex-direction: column; gap: 8px;">
                     <div style="display: flex; flex-direction: column; gap: 4px;">
@@ -1652,7 +1880,7 @@
                     <button id="clearDrawings" style="padding: 6px 12px; cursor: pointer; font-size: 14px; background: #ffffff; color: #000000; border: 2px solid #000000; border-radius: 0; box-shadow: 2px 2px 0 #000000; text-transform: uppercase;">Clear all pencil</button>
                 </div>
             </div>
-            <div class="color-section">
+            <div class="color-section" data-tools="all">
                 <div class="label-paint">Canvas background:</div>
                 <div style="display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;">
                     <input type="color" id="bgColorPicker" value="#ffffff" title="Canvas background color" style="width: 50px; height: 30px; border: 2px solid #000000; cursor: pointer;">
@@ -1669,9 +1897,6 @@
 
     </div>
 
-    <!-- Версии JS-обёрток должны совпадать с локальными WASM/моделями в public/mediapipe (см. download-mediapipe.sh) -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
 
     <script>
         // === ОПРЕДЕЛЕНИЕ МОБИЛЬНОГО УСТРОЙСТВА ===
@@ -1694,7 +1919,6 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const video = document.getElementById('videoElement');
-        const loading = document.getElementById('loading');
         const statusEl = document.getElementById('status'); // не 'status': так называется window.status
 
         let width, height;
@@ -1715,6 +1939,7 @@
         // Инструмент рисования (fill, pencil, eraser). Пустая строка = активен инструмент молекул из панели.
         // По умолчанию выбран инструмент молекул "select", поэтому рисование изначально выключено.
         let currentTool = '';
+        let lastPaintTool = 'fill'; // Инструмент рисования, который включается при входе в редактор
         let primaryColor = '#000000'; // Основной цвет
         let fillMode = 'both'; // Режим заливки: 'interior' (внутренность), 'edge' (контур), 'both' (оба)
 
@@ -4111,7 +4336,8 @@
                     const remapX = Math.max(0, Math.min(1, (palm.x - edgeMargin) / (1 - 2 * edgeMargin)));
                     const remapY = Math.max(0, Math.min(1, (palm.y - edgeMargin) / (1 - 2 * edgeMargin)));
 
-                    const handX = (1 - remapX) * width;  // Инвертируем X для зеркального отображения
+                    // Фронтальная камера отзеркалена (как зеркало), основная - нет
+                    const handX = (mirrorCamera ? 1 - remapX : remapX) * width;
                     const handY = remapY * height;
 
                     // УЛУЧШЕНО: Используем приоритетную систему жестов (стабилизация - по слоту руки)
@@ -4213,81 +4439,353 @@
             }
         }
 
-        // Диагностика для отладки проблем с MediaPipe
-        console.log('=== ДИАГНОСТИКА БРАУЗЕРА ===');
-        console.log('Браузер:', navigator.userAgent);
-        console.log('crossOriginIsolated:', window.crossOriginIsolated);
-        console.log('SharedArrayBuffer:', typeof SharedArrayBuffer !== 'undefined');
-        console.log('WebAssembly:', typeof WebAssembly !== 'undefined');
+        // === ЗАГРУЗКА РАСПОЗНАВАНИЯ ЖЕСТОВ (MediaPipe) ===
+        // Все файлы MediaPipe (JS-обёртки, WASM, модели) лежат на нашем сервере - без CDN.
+        // Большие файлы скачиваются заранее через fetch с подсчётом байтов: пользователь видит
+        // реальный прогресс, а MediaPipe потом получает их из памяти (blob URL) без повторной загрузки.
+        // Модель лица (режим редактирования ртом) грузится только после рук, чтобы не делить канал.
+        //
+        // Почему не MediaPipe Tasks Vision: замеры (октябрь 2026) показали, что старый движок уже
+        // считает на видеокарте и не медленнее (8.9 мс против 9.5 мс на кадр у Tasks GPU, Tasks CPU -
+        // 31.6 мс), а объём загрузки после brotli почти одинаковый (~9.4 vs ~9.2 МБ). См. ROADMAP.md.
+        const MEDIAPIPE_BASE = './mediapipe';
+        const HANDS_ASSETS = {
+            dir: 'hands',
+            script: 'hands.js',
+            files: [ // [имя, размер в байтах - для прогресса, если сервер не прислал Content-Length]
+                ['hands_solution_simd_wasm_bin.wasm', 6026259],
+                ['hands_solution_packed_assets.data', 4326731],
+                ['hand_landmark_full.tflite', 5478688]
+            ]
+        };
+        const FACE_ASSETS = {
+            dir: 'face_mesh',
+            script: 'face_mesh.js',
+            files: [
+                ['face_mesh_solution_simd_wasm_bin.wasm', 6161697],
+                ['face_mesh_solution_packed_assets.data', 3986256]
+            ]
+        };
+        const ENGINE_SLOW_MS = 12000;   // Столько без новых данных - предупреждаем о медленном соединении
+        const ENGINE_READY_HIDE_MS = 4000;
 
-        // Отслеживание ошибок загрузки
+        // Отслеживание файлов (для диагностики в консоли)
         let wasmFilesLoaded = [];
-        let wasmLoadErrors = [];
 
-        window.addEventListener('error', (event) => {
-            if (event.filename && event.filename.includes('mediapipe')) {
-                console.error('❌ Ошибка загрузки MediaPipe:', event.filename, event.message);
-                wasmLoadErrors.push(event.filename);
-            }
-        }, true);
-
-        // index.html лежит в public/, поэтому путь одинаковый для локального сервера и Vercel
-        const mediapipeBasePath = './mediapipe';
-
-        // Инициализация MediaPipe Hands.
-        // Скрипт hands.js грузится с CDN: если он не загрузился (нет сети, блокировщик),
-        // приложение должно продолжить работать с мышью/тачем, а не падать целиком.
-        console.log('=== ИНИЦИАЛИЗАЦИЯ MEDIAPIPE HANDS ===');
         let handsDetector = null;
-        if (typeof Hands === 'undefined') {
-            console.error('❌ MediaPipe Hands не загружен (CDN недоступен?) - жесты руками отключены');
-        } else {
-            handsDetector = new Hands({
-                locateFile: (file) => {
-                    wasmFilesLoaded.push(file);
-                    // Используем локальные файлы вместо CDN для быстрой загрузки
-                    return `${mediapipeBasePath}/hands/${file}`;
-                }
-            });
-
-            handsDetector.setOptions({
-                maxNumHands: 2,
-                modelComplexity: 1,  // Используем средний уровень сложности для баланса скорости/точности
-                minDetectionConfidence: 0.8,  // УЛУЧШЕНО: было 0.7 - более строгая детекция на расстоянии
-                minTrackingConfidence: 0.75   // УЛУЧШЕНО: было 0.7 - более надежное отслеживание
-            });
-
-            handsDetector.onResults(onResults);
-            console.log('MediaPipe Hands настроен');
-        }
-
-        // Инициализация MediaPipe FaceMesh для детекции открытого рта (отложенная, неблокирующая)
         let faceMesh = null;
         let faceMeshReady = false;
 
-        // Инициализируем FaceMesh асинхронно, чтобы не блокировать Hands
-        setTimeout(() => {
-            if (typeof FaceMesh === 'undefined') {
-                console.error('❌ MediaPipe FaceMesh не загружен - режим редактирования ртом отключен');
-                return;
+        // Состояние для карточки #engineCard
+        let cameraState = 'waiting';  // waiting | ok | denied | none | unsupported | error
+        let engineState = 'idle';     // idle | loading | starting | ready | error
+        let engineProgress = { loaded: 0, total: 1 };
+        let engineError = '';
+        let engineSlow = false;
+        let engineLastProgressTime = 0;
+        let engineAbort = null;
+        let engineCardDismissed = false;
+        let engineCardHideTimer = null;
+
+        const engineCard = document.getElementById('engineCard');
+        const engineTitleEl = document.getElementById('engineTitle');
+        const engineMessageEl = document.getElementById('engineMessage');
+        const engineNoteEl = document.getElementById('engineNote');
+        const engineProgressEl = document.getElementById('engineProgress');
+        const engineProgressBar = document.getElementById('engineProgressBar');
+        const engineRetryBtn = document.getElementById('engineRetry');
+
+        function formatMB(bytes) {
+            return (bytes / 1048576).toFixed(1);
+        }
+
+        // Скрипт-обёртка MediaPipe (один раз на страницу)
+        const loadedScripts = new Map();
+        function loadScriptOnce(src) {
+            if (!loadedScripts.has(src)) {
+                loadedScripts.set(src, new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = src;
+                    script.onload = resolve;
+                    script.onerror = () => {
+                        loadedScripts.delete(src); // Чтобы "Retry" попробовал снова
+                        reject(new Error(`Failed to load ${src}`));
+                    };
+                    document.head.appendChild(script);
+                }));
             }
-            console.log('=== ИНИЦИАЛИЗАЦИЯ MEDIAPIPE FACEMESH (асинхронно) ===');
-            faceMesh = new FaceMesh({
-                // Используем локальные файлы вместо CDN для быстрой загрузки
-                locateFile: (file) => `${mediapipeBasePath}/face_mesh/${file}`
-            });
+            return loadedScripts.get(src);
+        }
 
-            faceMesh.setOptions({
-                maxNumFaces: 1,
-                refineLandmarks: true,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
+        // Скачивает большие файлы с подсчётом прогресса и возвращает blob URL для locateFile
+        async function prefetchAssets(assets, signal, onProgress) {
+            const expectedTotal = assets.files.reduce((sum, [, size]) => sum + size, 0);
+            const loadedByFile = {};
+            const report = () => {
+                const loaded = Object.values(loadedByFile).reduce((a, b) => a + b, 0);
+                onProgress(loaded, Math.max(expectedTotal, loaded));
+            };
 
-            faceMesh.onResults(onFaceResults);
-            faceMeshReady = true;
-            console.log('✅ FaceMesh инициализирован');
-        }, 1000); // Задержка 1 секунда, чтобы Hands загрузился первым
+            const entries = await Promise.all(assets.files.map(async ([file]) => {
+                const response = await fetch(`${MEDIAPIPE_BASE}/${assets.dir}/${file}`, { signal });
+                if (!response.ok) {
+                    throw new Error(`${file}: HTTP ${response.status}`);
+                }
+                const type = file.endsWith('.wasm') ? 'application/wasm' : 'application/octet-stream';
+                loadedByFile[file] = 0;
+
+                if (!response.body || !response.body.getReader) {
+                    const buffer = await response.arrayBuffer();
+                    loadedByFile[file] = buffer.byteLength;
+                    report();
+                    return [file, URL.createObjectURL(new Blob([buffer], { type }))];
+                }
+
+                const reader = response.body.getReader();
+                const chunks = [];
+                for (;;) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    loadedByFile[file] += value.length;
+                    report();
+                }
+                return [file, URL.createObjectURL(new Blob(chunks, { type }))];
+            }));
+
+            return Object.fromEntries(entries);
+        }
+
+        function revokeAssetUrls(urls) {
+            for (const file of Object.keys(urls)) {
+                URL.revokeObjectURL(urls[file]);
+                delete urls[file]; // Повторный запрос файла пойдёт обычным путём, а не по отозванному URL
+            }
+        }
+
+        function setEngineState(state, error = '') {
+            engineState = state;
+            engineError = error;
+            if (state === 'error') engineCardDismissed = false; // Ошибку показываем, даже если карточку скрыли
+            renderEngineCard();
+        }
+
+        function setCameraState(state) {
+            cameraState = state;
+            if (state !== 'ok' && state !== 'waiting') engineCardDismissed = false;
+            renderEngineCard();
+        }
+
+        // Карточка состояния: камера + загрузка распознавания. Приоритет - у проблем с камерой.
+        function renderEngineCard() {
+            clearTimeout(engineCardHideTimer);
+            let title = 'Gestures';
+            let message = '';
+            let note = '';
+            let progress = null;    // 0..1, 'indeterminate' или null (без полосы)
+            let retry = false;
+            let autoHide = false;
+
+            if (cameraState === 'denied') {
+                title = 'Camera is blocked';
+                message = 'Gestures need the camera. Allow camera access for this site (camera icon in the address bar or browser settings), then press Retry.';
+                note = 'Mouse and touch tools work without the camera.';
+                retry = true;
+            } else if (cameraState === 'none') {
+                title = 'No camera found';
+                message = 'Connect a camera and press Retry to use gestures.';
+                note = 'Mouse and touch tools work without the camera.';
+                retry = true;
+            } else if (cameraState === 'unsupported') {
+                title = 'Camera unavailable';
+                message = window.isSecureContext
+                    ? 'This browser does not support camera access.'
+                    : 'Camera works only over HTTPS or on localhost.';
+                note = 'Mouse and touch tools still work.';
+            } else if (cameraState === 'error') {
+                title = 'Camera error';
+                message = 'The camera could not be started (it may be used by another app).';
+                note = 'Close other apps using the camera and press Retry.';
+                retry = true;
+            } else if (engineState === 'error') {
+                title = 'Hand tracking failed to load';
+                message = engineError || 'Check your connection and press Retry.';
+                note = 'Mouse and touch tools work in the meantime.';
+                retry = true;
+            } else if (engineState === 'loading' || engineState === 'idle') {
+                const { loaded, total } = engineProgress;
+                title = 'Loading hand tracking';
+                message = `Downloading model: ${Math.round((loaded / total) * 100)}% (${formatMB(loaded)} / ${formatMB(total)} MB)`;
+                progress = loaded / total;
+                note = engineSlow
+                    ? 'Slow connection - still loading. Mouse and touch tools already work.'
+                    : (cameraState === 'waiting' ? 'Allow camera access when the browser asks.' : 'Mouse and touch tools already work.');
+                retry = engineSlow;
+            } else if (engineState === 'starting') {
+                title = 'Starting hand tracking';
+                message = 'Almost ready...';
+                progress = 'indeterminate';
+            } else if (engineState === 'ready' && cameraState === 'waiting') {
+                title = 'Gestures';
+                message = 'Allow camera access when the browser asks.';
+            } else if (engineState === 'ready') {
+                title = 'Gestures ready';
+                message = 'Pinch thumb and index finger for 1 second to create a molecule. Open palm moves it.';
+                note = 'All gestures: "?" button (manual).';
+                autoHide = true;
+            }
+
+            engineTitleEl.textContent = title;
+            engineMessageEl.textContent = message;
+            engineNoteEl.textContent = note;
+            engineRetryBtn.hidden = !retry;
+
+            engineProgressEl.hidden = progress === null;
+            engineProgressEl.classList.toggle('indeterminate', progress === 'indeterminate');
+            if (typeof progress === 'number') {
+                engineProgressBar.style.width = `${Math.min(100, progress * 100).toFixed(1)}%`;
+            } else {
+                engineProgressBar.style.width = '';
+            }
+
+            engineCard.hidden = engineCardDismissed || (!message && !title);
+            if (autoHide) {
+                engineCardHideTimer = setTimeout(() => { engineCard.hidden = true; }, ENGINE_READY_HIDE_MS);
+            }
+        }
+
+        document.getElementById('engineCardClose').addEventListener('click', () => {
+            engineCardDismissed = true;
+            engineCard.hidden = true;
+        });
+
+        engineRetryBtn.addEventListener('click', () => retryGestureSetup());
+
+        // Предупреждение о медленном соединении: прогресс не двигается ENGINE_SLOW_MS
+        setInterval(() => {
+            if (engineState !== 'loading') return;
+            const slow = performance.now() - engineLastProgressTime > ENGINE_SLOW_MS;
+            if (slow !== engineSlow) {
+                engineSlow = slow;
+                renderEngineCard();
+            }
+        }, 1000);
+
+        async function startHandsEngine() {
+            if (engineAbort) engineAbort.abort();
+            const abort = new AbortController();
+            engineAbort = abort;
+
+            engineProgress = { loaded: 0, total: HANDS_ASSETS.files.reduce((s, [, size]) => s + size, 0) };
+            engineSlow = false;
+            engineLastProgressTime = performance.now();
+            setEngineState('loading');
+
+            let urls = {};
+            try {
+                await loadScriptOnce(`${MEDIAPIPE_BASE}/hands/${HANDS_ASSETS.script}`);
+                urls = await prefetchAssets(HANDS_ASSETS, abort.signal, (loaded, total) => {
+                    engineProgress = { loaded, total };
+                    engineLastProgressTime = performance.now();
+                    if (engineSlow) engineSlow = false;
+                    renderEngineCard();
+                });
+
+                setEngineState('starting');
+                if (handsDetector) {
+                    handsDetector.close();
+                    handsDetector = null;
+                }
+                const detector = new Hands({
+                    locateFile: (file) => {
+                        wasmFilesLoaded.push(file);
+                        return urls[file] || `${MEDIAPIPE_BASE}/hands/${file}`;
+                    }
+                });
+                detector.setOptions({
+                    maxNumHands: 2,
+                    modelComplexity: 1,  // Используем средний уровень сложности для баланса скорости/точности
+                    minDetectionConfidence: 0.8,  // УЛУЧШЕНО: было 0.7 - более строгая детекция на расстоянии
+                    minTrackingConfidence: 0.75   // УЛУЧШЕНО: было 0.7 - более надежное отслеживание
+                });
+                detector.onResults(onResults);
+                await detector.initialize();
+                if (abort.signal.aborted) {
+                    detector.close();
+                    return;
+                }
+
+                handsDetector = detector;
+                setEngineState('ready');
+                console.log('✅ MediaPipe Hands готов');
+
+                // Лицо - после рук и без блокировки: без него не работает только режим редактирования ртом
+                startFaceEngine(abort.signal);
+            } catch (error) {
+                if (abort.signal.aborted) return;
+                console.error('❌ Не удалось загрузить MediaPipe Hands:', error);
+                setEngineState('error', navigator.onLine === false
+                    ? 'You are offline. Connect to the internet and press Retry.'
+                    : 'Could not download the hand tracking model. Check your connection and press Retry.');
+            } finally {
+                revokeAssetUrls(urls);
+            }
+        }
+
+        async function startFaceEngine(signal) {
+            let urls = {};
+            try {
+                await loadScriptOnce(`${MEDIAPIPE_BASE}/face_mesh/${FACE_ASSETS.script}`);
+                urls = await prefetchAssets(FACE_ASSETS, signal, () => {});
+                const mesh = new FaceMesh({
+                    locateFile: (file) => urls[file] || `${MEDIAPIPE_BASE}/face_mesh/${file}`
+                });
+                mesh.setOptions({
+                    maxNumFaces: 1,
+                    // Уточнение радужки глаз не нужно для определения открытого рта, а стоит
+                    // вдвое больше времени на кадр (6.3 -> 2.9 мс в замерах)
+                    refineLandmarks: false,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+                mesh.onResults(onFaceResults);
+                await mesh.initialize();
+                if (signal.aborted) {
+                    mesh.close();
+                    return;
+                }
+                faceMesh = mesh;
+                faceMeshReady = true;
+                console.log('✅ FaceMesh готов');
+            } catch (error) {
+                if (!signal.aborted) {
+                    console.warn('FaceMesh не загружен - режим редактирования ртом недоступен:', error);
+                }
+            } finally {
+                revokeAssetUrls(urls);
+            }
+        }
+
+        // Камера не нужна - не тратим трафик на модели
+        function stopGestureEngineDownload() {
+            if (engineAbort && engineState !== 'ready') {
+                engineAbort.abort();
+                engineState = 'idle';
+            }
+        }
+
+        async function retryGestureSetup() {
+            engineRetryBtn.hidden = true;
+            if (cameraState !== 'ok') {
+                setCameraState('waiting');
+                const camera = await setupCamera();
+                if (!camera) return;
+                startDetectionLoop();
+            }
+            if (engineState !== 'ready') {
+                startHandsEngine();
+            }
+        }
 
         // Обработка результатов FaceMesh
         function onFaceResults(results) {
@@ -4318,8 +4816,9 @@
                             mouthOpenFrames = 0;
                         }
 
-                        // Рот считается открытым только если был открыт минимум 3 кадра подряд
-                        isMouthOpen = mouthOpenFrames >= 3;
+                        // Рот считается открытым, если был открыт 2 кадра лица подряд (~0.2 с:
+                        // лицо распознаётся ~10 раз в секунду, см. FACE_EVERY_N)
+                        isMouthOpen = mouthOpenFrames >= 2;
 
                         // TOGGLE режима редактирования при открытии рта
                         if (isMouthOpen && !wasMouthOpen) {
@@ -4365,6 +4864,17 @@
         }
 
         // Инициализация камеры
+        const BASE_VIDEO_CONSTRAINTS = {
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        };
+        let currentStream = null;
+        let cameraFacing = 'user';     // 'user' - фронтальная, 'environment' - основная (задняя)
+        let mirrorCamera = true;       // Фронтальная камера показывается зеркально, основная - как есть
+        let videoInputs = [];          // Список камер (после разрешения доступа)
+        let cameraSwitching = false;
+        const toggleCameraBtn = document.getElementById('toggleCamera');
+
         function attachCameraStream(stream) {
             video.srcObject = stream;
             return new Promise((resolve) => {
@@ -4379,54 +4889,178 @@
             });
         }
 
+        function stopCurrentStream() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+        }
+
+        // Зеркалим только фронтальную камеру. Веб-камеры ноутбуков не сообщают facingMode -
+        // для них тоже включаем зеркало (человек смотрит в камеру, как в зеркало).
+        function applyCameraOrientation(stream) {
+            const track = stream.getVideoTracks()[0];
+            const settings = track && track.getSettings ? track.getSettings() : {};
+            let facing = settings.facingMode;
+            // Не все камеры сообщают facingMode (часть Android, USB-камеры) - определяем по названию:
+            // iOS - "Back Camera", Android - "camera2 0, facing back"
+            if (facing !== 'environment' && facing !== 'user' && track) {
+                facing = /back|rear|environment/i.test(track.label) ? 'environment' : 'user';
+            }
+            cameraFacing = facing;
+            mirrorCamera = facing !== 'environment';
+            video.style.transform = mirrorCamera ? 'scaleX(-1)' : 'none';
+        }
+
+        function currentDeviceId() {
+            const track = currentStream && currentStream.getVideoTracks()[0];
+            return track && track.getSettings ? track.getSettings().deviceId : null;
+        }
+
+        async function openNextCameraInList(fromDeviceId) {
+            const index = videoInputs.findIndex(d => d.deviceId === fromDeviceId);
+            const next = videoInputs[(index + 1) % videoInputs.length];
+            await openCamera({ ...BASE_VIDEO_CONSTRAINTS, deviceId: { exact: next.deviceId } });
+        }
+
+        async function openCamera(videoConstraints) {
+            // Сначала освобождаем текущую камеру: многие телефоны не открывают вторую параллельно
+            stopCurrentStream();
+            const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+            currentStream = stream;
+            applyCameraOrientation(stream);
+            return attachCameraStream(stream);
+        }
+
         async function setupCamera() {
             console.log('Начинаем инициализацию камеры...');
 
             // Проверяем поддержку API (getUserMedia доступен только по HTTPS или на localhost)
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 console.error('getUserMedia не поддерживается в этом браузере');
-                statusEl.textContent = window.isSecureContext
-                    ? 'Error: browser does not support camera access'
-                    : 'Error: camera requires HTTPS or localhost';
+                statusEl.textContent = 'Camera unavailable - mouse/touch only';
+                setCameraState('unsupported');
+                stopGestureEngineDownload();
                 return null;
             }
 
-            // Параметры видео (значения без exact - это пожелания, браузер подберёт ближайшие)
-            const videoConstraints = {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: 'user' // Фронтальная камера для жестов
-            };
-
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+                // Значения без exact - пожелания, браузер подберёт ближайшие
+                const camera = await openCamera({ ...BASE_VIDEO_CONSTRAINTS, facingMode: cameraFacing });
                 console.log('Доступ к камере получен!');
-                return await attachCameraStream(stream);
+                setCameraState('ok');
+                updateCameraSwitchButton();
+                return camera;
             } catch (error) {
                 console.error('Ошибка доступа к камере:', error.name, error.message);
 
                 // Отказ в доступе повторять бессмысленно - второй запрос тоже будет отклонён
                 if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
                     statusEl.textContent = 'Camera access denied - mouse/touch only';
+                    setCameraState('denied');
+                    stopGestureEngineDownload();
                     return null;
                 }
                 if (error.name === 'NotFoundError') {
                     statusEl.textContent = 'No camera found - mouse/touch only';
+                    setCameraState('none');
+                    stopGestureEngineDownload();
                     return null;
                 }
 
                 // Пробуем с более простыми параметрами (например, камера не поддерживает facingMode)
                 try {
                     console.log('Пробуем запросить камеру с базовыми параметрами...');
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    return await attachCameraStream(stream);
+                    const camera = await openCamera(true);
+                    setCameraState('ok');
+                    updateCameraSwitchButton();
+                    return camera;
                 } catch (fallbackError) {
                     console.error('Не удалось получить доступ к камере:', fallbackError);
                     statusEl.textContent = `Camera error: ${fallbackError.name}`;
+                    setCameraState('error');
                     return null;
                 }
             }
         }
+
+        // Кнопка смены камеры видна, если камер больше одной (телефоны, планшеты, внешняя веб-камера)
+        async function updateCameraSwitchButton() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                videoInputs = devices.filter(d => d.kind === 'videoinput');
+            } catch {
+                videoInputs = [];
+            }
+            toggleCameraBtn.hidden = !(cameraState === 'ok' && videoInputs.length > 1);
+        }
+
+        if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+            navigator.mediaDevices.addEventListener('devicechange', updateCameraSwitchButton);
+        }
+
+        // Распознавание продолжает работать на новой камере, но старая история жестов к ней не относится
+        function resetHandTracking() {
+            hands = [];
+            gestureHistory = [];
+            for (let slot = 0; slot < MAX_HAND_SLOTS; slot++) {
+                resetGestureStability(slot);
+                pinchHoldStarts[slot] = null;
+                pinchCreatedFlags[slot] = false;
+                pinchReleaseTime[slot] = null;
+            }
+            if (handsDetector && handsDetector.reset) handsDetector.reset();
+            if (faceMesh && faceMesh.reset) faceMesh.reset();
+        }
+
+        async function switchCamera() {
+            if (cameraSwitching) return;
+            cameraSwitching = true;
+            toggleCameraBtn.disabled = true;
+
+            const previousDeviceId = currentDeviceId();
+            const previousFacing = cameraFacing;
+
+            try {
+                if (isMobile) {
+                    // Телефон/планшет: фронтальная <-> основная. Если exact не поддерживается - мягкий запрос.
+                    const nextFacing = cameraFacing === 'user' ? 'environment' : 'user';
+                    try {
+                        await openCamera({ ...BASE_VIDEO_CONSTRAINTS, facingMode: { exact: nextFacing } });
+                    } catch {
+                        await openCamera({ ...BASE_VIDEO_CONSTRAINTS, facingMode: nextFacing });
+                    }
+                    // Браузер открыл ту же камеру (facingMode не поддерживается) - берём следующую по списку
+                    if (currentDeviceId() === previousDeviceId && videoInputs.length > 1) {
+                        await openNextCameraInList(previousDeviceId);
+                    }
+                } else {
+                    // Компьютер: следующая камера по списку
+                    await openNextCameraInList(previousDeviceId);
+                }
+                resetHandTracking();
+                const label = mirrorCamera ? 'front camera' : 'back camera';
+                const track = currentStream.getVideoTracks()[0];
+                statusEl.textContent = `Camera: ${isMobile ? label : (track && track.label) || label}`;
+            } catch (error) {
+                console.error('Не удалось переключить камеру:', error);
+                statusEl.textContent = 'Could not switch camera';
+                // Возвращаем прежнюю камеру
+                try {
+                    await openCamera(previousDeviceId
+                        ? { ...BASE_VIDEO_CONSTRAINTS, deviceId: { exact: previousDeviceId } }
+                        : { ...BASE_VIDEO_CONSTRAINTS, facingMode: previousFacing });
+                } catch (restoreError) {
+                    console.error('Не удалось вернуть камеру:', restoreError);
+                    setCameraState('error');
+                }
+            } finally {
+                cameraSwitching = false;
+                toggleCameraBtn.disabled = false;
+            }
+        }
+
+        toggleCameraBtn.addEventListener('click', switchCamera);
 
         // === ФУНКЦИИ ДЛЯ ОТМЕНЫ ДЕЙСТВИЙ (Ctrl+Z) ===
         // В истории хранятся снимки состояния ПОСЛЕ каждого действия; undoHistory[0] - исходное состояние,
@@ -4573,12 +5207,69 @@
         // Видео с камеры как фон (режим "Show video")
         function drawCameraBackground() {
             if (config.showVideo && video.videoWidth > 0) {
-                ctx.save();
-                // Отзеркаливаем видео
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, -width, 0, width, height);
-                ctx.restore();
+                if (mirrorCamera) {
+                    ctx.save();
+                    // Отзеркаливаем видео фронтальной камеры
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(video, -width, 0, width, height);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(video, 0, 0, width, height);
+                }
             }
+        }
+
+        // Подсказка по центру пустого холста (рисуется поверх сцены, в экспорт и запись не попадает)
+        function drawEmptyStateHint() {
+            const touch = isTouchDevice && currentLayout !== 'desktop';
+            const action = touch ? 'tap' : 'click';
+            let lines;
+            if (editorMode) {
+                lines = ['Draw with the Pencil', `or choose Create and ${action} to add molecules to paint`];
+            } else if (cameraState === 'ok' && handsDetector) {
+                lines = ['Pinch thumb and index finger in front of the camera', `or choose Create and ${action} the canvas`];
+            } else {
+                lines = [`Choose Create and ${action} the canvas`, 'to add your first molecule'];
+            }
+
+            const big = currentLayout === 'phone' ? 16 : 20;
+            const small = Math.round(big * 0.75);
+            const maxWidth = Math.min(width - 40, 560);
+
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+
+            // Перенос по словам, чтобы текст помещался на узком экране
+            const wrap = (text, fontSize) => {
+                ctx.font = `${fontSize}px SysfontC, monospace`;
+                const result = [];
+                let line = '';
+                for (const word of text.split(' ')) {
+                    const candidate = line ? `${line} ${word}` : word;
+                    if (line && ctx.measureText(candidate).width > maxWidth) {
+                        result.push(line);
+                        line = word;
+                    } else {
+                        line = candidate;
+                    }
+                }
+                result.push(line);
+                return result.map(textLine => ({ text: textLine, fontSize }));
+            };
+            const rows = [...wrap(lines[0], big), ...wrap(lines[1], small)];
+
+            const lineGap = 1.5;
+            const totalHeight = rows.reduce((sum, row) => sum + row.fontSize * lineGap, 0);
+            let y = height / 2 - (currentLayout === 'phone' ? 40 : 0) - totalHeight / 2;
+            for (const row of rows) {
+                ctx.font = `${row.fontSize}px SysfontC, monospace`;
+                y += row.fontSize * lineGap / 2;
+                ctx.fillText(row.text, width / 2, y);
+                y += row.fontSize * lineGap / 2;
+            }
+            ctx.restore();
         }
 
         // Основной цикл анимации
@@ -5172,6 +5863,15 @@
                 }
             }
 
+            // Состояние кнопок Lock/Unlock по текущему выделению
+            updateSelectionButtons();
+
+            // Подсказка на пустом холсте: новому пользователю иначе непонятно, с чего начать
+            if (molecules.length === 0 && drawnStrokes.length === 0 && !currentStroke &&
+                filledRegions.length === 0 && backgroundFills.length === 0) {
+                drawEmptyStateHint();
+            }
+
             // Индикатор режима производительности - только если качество снижено автоматически
             // из-за медленных кадров (на телефонах экономный режим включён сразу и плашка не нужна).
             // Рисуем по центру под индикатором режима: в левом верхнем углу её перекрывала кнопка "?".
@@ -5204,54 +5904,47 @@
             requestAnimationFrame(animate);
         }
 
-        // Обработка видео для MediaPipe
-        let detectHandsStarted = false;
+        // Обработка видео для MediaPipe.
+        // Распознаём только НОВЫЕ кадры камеры: камера даёт 15-30 кадров/с, а цикл requestAnimationFrame
+        // крутится 60 раз/с - раньше до 2/3 работы нейросети уходило на повтор того же кадра.
+        let detectLoopRunning = false;
         let sendCount = 0;
         let detectErrorCount = 0;
+        let lastVideoFrameKey = -1;
 
-        // Экономный режим на телефонах и планшетах: распознаём руки не чаще ~20 раз в секунду,
-        // а лицо (детектор открытого рта) - через кадр. Нейросети - основная нагрузка на батарею
-        // и причина нагрева; для жестов 20 кадров в секунду достаточно.
+        // Номер текущего кадра видео. currentTime для этого не годится: он растёт непрерывно,
+        // а не по кадрам. Если браузер не считает кадры (totalVideoFrames = 0) - откат на currentTime.
+        function getVideoFrameKey() {
+            const quality = video.getVideoPlaybackQuality ? video.getVideoPlaybackQuality() : null;
+            return quality && quality.totalVideoFrames > 0 ? quality.totalVideoFrames : video.currentTime;
+        }
+
+        // Экономный режим на телефонах и планшетах: распознаём руки не чаще ~20 раз в секунду.
+        // Лицо (детектор открытого рта) - примерно 10 раз в секунду на всех устройствах.
         const MOBILE_DETECT_INTERVAL_MS = 50;
-        const MOBILE_FACE_EVERY_N = 2;
+        const FACE_EVERY_N = isMobile ? 2 : 3;
         let lastDetectTime = 0;
+
+        function startDetectionLoop() {
+            if (detectLoopRunning) return;
+            detectLoopRunning = true;
+            requestAnimationFrame(detectHands);
+        }
 
         async function detectHands() {
             const now = performance.now();
-            if (isMobile && now - lastDetectTime < MOBILE_DETECT_INTERVAL_MS) {
-                requestAnimationFrame(detectHands);
-                return;
-            }
-            lastDetectTime = now;
+            const frameKey = getVideoFrameKey();
+            const hasNewFrame = video.readyState >= video.HAVE_CURRENT_DATA && frameKey !== lastVideoFrameKey;
+            const throttled = isMobile && now - lastDetectTime < MOBILE_DETECT_INTERVAL_MS;
 
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                if (!detectHandsStarted) {
-                    console.log('✅ Видео готово, начинаем детекцию рук');
-                    detectHandsStarted = true;
-                }
+            if (handsDetector && hasNewFrame && !throttled && !cameraSwitching) {
+                lastVideoFrameKey = frameKey;
+                lastDetectTime = now;
+                sendCount++;
                 try {
-                    sendCount++;
-                    if (sendCount === 1) {
-                        console.log('Отправляем первый кадр в MediaPipe...');
-                    }
-                    if (sendCount === 30 && frameCount === 0) {
-                        console.warn('⚠️ Отправлено 30 кадров, но onResults ни разу не вызван!');
-                        console.warn('MediaPipe WASM не инициализировался.');
-                        console.warn('Загружено файлов:', wasmFilesLoaded);
-                        console.warn('Ошибки загрузки:', wasmLoadErrors.length > 0 ? wasmLoadErrors : 'нет');
-                        console.warn('crossOriginIsolated:', window.crossOriginIsolated);
-                    }
-                    if (sendCount === 100 && frameCount === 0) {
-                        console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: MediaPipe не работает после 100 кадров!');
-                        console.error('Это может быть проблема с CORS или COEP политикой.');
-                        console.error('Проверьте Network вкладку в DevTools для деталей.');
-                    }
-
-                    if (handsDetector) {
-                        await handsDetector.send({ image: video });
-                    }
+                    await handsDetector.send({ image: video });
                     // FaceMesh опционально - не блокирует работу рук
-                    if (faceMeshReady && faceMesh && (!isMobile || sendCount % MOBILE_FACE_EVERY_N === 0)) {
+                    if (faceMeshReady && faceMesh && sendCount % FACE_EVERY_N === 0) {
                         try {
                             await faceMesh.send({ image: video });
                         } catch {
@@ -5259,7 +5952,7 @@
                         }
                     }
                 } catch (error) {
-                    // Не засоряем консоль одной и той же ошибкой 60 раз в секунду
+                    // Не засоряем консоль одной и той же ошибкой много раз в секунду
                     detectErrorCount++;
                     if (detectErrorCount <= 5) {
                         console.error('❌ Ошибка детекции рук:', error);
@@ -5581,6 +6274,14 @@
             if (open && isCompactLayout()) {
                 setPaletteOpen(false);
             }
+            updateSidePanelState();
+        }
+
+        // Класс на <html>, пока открыта панель настроек или палитра (см. CSS про кнопку ≡)
+        function updateSidePanelState() {
+            const paletteOpen = colorPalette.classList.contains('active');
+            const controlsOpen = !controlsPanel.classList.contains('minimized');
+            document.documentElement.classList.toggle('side-panel-open', paletteOpen || controlsOpen);
         }
 
         closeControlsBtn.addEventListener('click', () => setControlsPanelOpen(false));
@@ -5606,7 +6307,11 @@
             currentStroke = null;
 
             canvas.style.cursor = getCursorForTool(tool);
-            statusEl.textContent = `Tool: ${getToolName(tool)}`;
+            statusEl.textContent = getToolName(tool);
+            // Без инструмента рисования палитра показывает все секции - с нейтральными подписями
+            document.getElementById('fillModeLabel').textContent = 'Fill mode:';
+            document.getElementById('pencilToolLabel').textContent = 'Pencil:';
+            updatePaletteSections();
         }
 
         document.querySelectorAll('.tool-btn:not(.paint-tool-btn)').forEach(btn => {
@@ -5625,14 +6330,24 @@
             }
         }
 
-        // Tool name
+        // Название инструмента + что им делать (для строки статуса).
+        // На сенсорных раскладках - про касания, на десктопе - про мышь и клавиши.
         function getToolName(tool) {
+            const touch = isTouchDevice && currentLayout !== 'desktop';
             switch(tool) {
-                case 'select': return 'Select (mouse=move, Ctrl/Cmd=size, Shift=stretch, Alt=rotate, wheel=size)';
-                case 'create': return 'Create molecules';
-                case 'delete': return 'Delete molecules';
+                case 'select': return touch
+                    ? 'Select: tap a molecule, drag to move, two fingers to resize and rotate'
+                    : 'Select: drag a molecule to move (Ctrl/Cmd = size, Shift = stretch, Alt = rotate, wheel = size)';
+                case 'create': return touch ? 'Create: tap the canvas to add a molecule' : 'Create: click the canvas to add a molecule';
+                case 'delete': return touch ? 'Delete: tap a molecule to remove it' : 'Delete: click a molecule to remove it';
                 default: return 'Unknown tool';
             }
+        }
+
+        // Пользователь ткнул в пустое место инструментом Select - скорее всего, хотел создать молекулу
+        function showCreateToolHint() {
+            const touch = isTouchDevice && currentLayout !== 'desktop';
+            showHint('create-tool', `${touch ? 'Tapping' : 'Clicking'} with Select only picks and moves molecules. To add a new one, choose the Create tool (second button on the toolbar) or pinch thumb and index finger in front of the camera.`, { once: false });
         }
 
         // Фиксация выбранной молекулы
@@ -5657,13 +6372,58 @@
             }
         });
 
+        // === ПОДСКАЗКИ ===
+        // Короткие подсказки в ключевые моменты: первый вход в редактор, касание пустого места
+        // инструментом Select и т.п. once: true - один раз за всё время (localStorage),
+        // once: false - не чаще раза за сеанс.
+        const hintToast = document.getElementById('hintToast');
+        const hintTextEl = document.getElementById('hintText');
+        const hintsShownThisSession = new Set();
+        let hintTimer = null;
+
+        function isHintSeen(key) {
+            try {
+                return localStorage.getItem(`vi-hint:${key}`) === '1';
+            } catch {
+                return hintsShownThisSession.has(key);
+            }
+        }
+
+        function markHintSeen(key) {
+            try {
+                localStorage.setItem(`vi-hint:${key}`, '1');
+            } catch {
+                // Хранилище недоступно (приватный режим) - подсказка покажется снова в следующий раз
+            }
+        }
+
+        function showHint(key, text, { once = true, duration = 10000 } = {}) {
+            if (hintsShownThisSession.has(key) || (once && isHintSeen(key))) return;
+            hintsShownThisSession.add(key);
+            if (once) markHintSeen(key);
+
+            hintTextEl.textContent = text;
+            hintToast.hidden = false;
+            clearTimeout(hintTimer);
+            hintTimer = setTimeout(hideHint, duration);
+        }
+
+        function hideHint() {
+            clearTimeout(hintTimer);
+            hintToast.hidden = true;
+        }
+
+        document.getElementById('hintClose').addEventListener('click', hideHint);
+
         // === ПАЛИТРА И КНОПКИ ПАНЕЛИ "EDIT" ===
         const colorPalette = document.getElementById('colorPalette');
         const closePaletteBtn = document.getElementById('closePalette');
         const actionUndoBtn = document.getElementById('action-undo');
         const actionRedoBtn = document.getElementById('action-redo');
-        const actionModeBtn = document.getElementById('action-mode');
         const actionPaletteBtn = document.getElementById('action-palette');
+        const actionLockBtn = document.getElementById('action-lock');
+        const actionUnlockBtn = document.getElementById('action-unlock');
+        const modeOptions = document.querySelectorAll('#modeSwitch .mode-option');
 
         // Палитра открывается кнопкой на панели инструментов (на всех раскладках)
         function setPaletteOpen(open) {
@@ -5673,6 +6433,7 @@
             if (open && isCompactLayout()) {
                 setControlsPanelOpen(false);
             }
+            updateSidePanelState();
         }
 
         function togglePalette() {
@@ -5684,7 +6445,34 @@
 
         actionUndoBtn.addEventListener('click', () => undo());
         actionRedoBtn.addEventListener('click', () => redo());
-        actionModeBtn.addEventListener('click', () => toggleEditorMode());
+        // Переключатель режима "Gestures | Editor"
+        modeOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const wantEditor = option.dataset.mode === 'editor';
+                if (wantEditor !== editorMode) toggleEditorMode();
+            });
+        });
+
+        function updateModeSwitch() {
+            modeOptions.forEach(option => {
+                const active = (option.dataset.mode === 'editor') === editorMode;
+                option.classList.toggle('active', active);
+                option.setAttribute('aria-pressed', String(active));
+            });
+        }
+
+        // Lock/Unlock доступны только когда есть выделенная молекула и действие имеет смысл.
+        // Вызывается каждый кадр из animate(): выделение меняется во многих местах (клик, тач,
+        // удаление, слияние, отмена), а DOM трогаем только при реальном изменении.
+        let lastSelectionButtonsState = '';
+        function updateSelectionButtons() {
+            const mol = selectedMoleculeUI;
+            const state = mol ? (mol.isLocked ? 'locked' : 'unlocked') : 'none';
+            if (state === lastSelectionButtonsState) return;
+            lastSelectionButtonsState = state;
+            actionLockBtn.disabled = state !== 'unlocked';
+            actionUnlockBtn.disabled = state !== 'locked';
+        }
 
         // Высота нижней панели на телефоне -> CSS-переменная --toolbar-h: по ней над панелью
         // располагаются строка статуса и выезжающие листы (панель может занимать 1 или 2 строки)
@@ -5739,10 +6527,20 @@
 
         // === PAINT РЕЖИМ РЕДАКТОРА - UI ===
 
+        // Текущий цвет показывает само поле выбора цвета (раньше - отдельный квадрат и отдельное поле)
         function setPrimaryColor(color, activeSwatch = null) {
             primaryColor = color;
-            document.getElementById('primaryColor').style.background = color;
+            document.getElementById('customPrimaryColor').value = color;
             document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s === activeSwatch));
+        }
+
+        // Палитра показывает только то, что относится к выбранному инструменту рисования:
+        // раньше были видны все настройки сразу (эффекты при карандаше, толщина при заливке)
+        function updatePaletteSections() {
+            document.querySelectorAll('#colorPalette .color-section[data-tools]').forEach(section => {
+                const tools = section.dataset.tools.split(' ');
+                section.hidden = !(tools.includes('all') || !currentTool || tools.includes(currentTool));
+            });
         }
 
         // Инициализация палитры цветов
@@ -5763,6 +6561,8 @@
                 setPrimaryColor(e.target.value);
             });
 
+            setPrimaryColor(primaryColor, colorGrid.firstElementChild);
+
             // Палитра скрыта, пока не включён режим редактора
             setPaletteOpen(false);
         }
@@ -5771,23 +6571,14 @@
         function toggleEditorMode() {
             editorMode = !editorMode;
 
-            const modeBtn = document.getElementById('modeToggleBtn');
-            const modeIndicator = document.getElementById('modeIndicator');
-
             // Незавершённый штрих или подсветка не должны "перетекать" между режимами
             isDrawing = false;
             currentStroke = null;
             hoveredMoleculeEditor = null;
 
             if (editorMode) {
-                // Переход в режим редактора
-                modeBtn.textContent = 'Gesture mode';
-                modeIndicator.textContent = 'Editor mode';
-                modeIndicator.className = 'mode-indicator editor-mode active';
-
-                // Показываем инструменты рисования и кнопку палитры в режиме редактора
+                // Переход в режим редактора: показываем инструменты рисования и кнопку палитры
                 document.getElementById('paintToolsSection').hidden = false;
-                actionPaletteBtn.hidden = false;
 
                 // На телефоне палитра открывается кнопкой (иначе закрывает полэкрана), на остальных - сразу
                 setPaletteOpen(currentLayout !== 'phone');
@@ -5795,16 +6586,18 @@
                 // В редакторе молекулы не обновляются жестами - снимаем "захват" ладонью
                 molecules.forEach(mol => { mol.isGrabbed = false; });
 
-                statusEl.textContent = `Editor mode | Molecules: ${molecules.length}`;
-            } else {
-                // Возврат в режим жестов
-                modeBtn.textContent = 'Editor mode';
-                modeIndicator.textContent = 'Gesture mode';
-                modeIndicator.className = 'mode-indicator gesture-mode active';
+                // Сразу включаем инструмент рисования (последний использованный, по умолчанию - заливку).
+                // Раньше после входа в редактор оставался инструмент Select, и было неочевидно,
+                // что нужно ещё отдельно выбрать заливку или карандаш.
+                selectPaintTool(lastPaintTool);
 
-                // Скрываем инструменты рисования и палитру в режиме жестов
+                const paletteWhere = currentLayout === 'phone'
+                    ? 'Open Colors (palette button on the toolbar) to pick a color'
+                    : 'Pick a color in the Colors panel';
+                showHint('editor-intro', `Editor mode: the Fill tool is on. ${paletteWhere}, then tap a molecule or a closed pencil shape to fill it. Pencil draws, eraser erases. "Gestures" at the top returns to gesture mode.`);
+            } else {
+                // Возврат в режим жестов: скрываем инструменты рисования и палитру
                 document.getElementById('paintToolsSection').hidden = true;
-                actionPaletteBtn.hidden = true;
                 setPaletteOpen(false);
 
                 // Инструменты рисования доступны только в редакторе. Раньше после выхода
@@ -5816,14 +6609,8 @@
                 statusEl.textContent = 'Gesture mode | Ready';
             }
 
-            // Кнопка режима на панели инструментов
-            actionModeBtn.classList.toggle('active', editorMode);
-            actionModeBtn.setAttribute('aria-pressed', String(editorMode));
-            actionModeBtn.title = editorMode ? 'Back to gesture mode' : 'Editor mode (paint)';
+            updateModeSwitch();
         }
-
-        // Обработчик кнопки переключения режима
-        document.getElementById('modeToggleBtn').addEventListener('click', toggleEditorMode);
 
         // Курсор для инструментов рисования
         function getPaintCursor(tool, overMolecule) {
@@ -5849,21 +6636,28 @@
             const pencilToolLabel = document.getElementById('pencilToolLabel');
             const smartEraserCheckbox = document.getElementById('smartEraserCheckbox');
 
-            fillModeLabel.style.display = tool === 'pencil' ? 'none' : 'block';
             fillModeLabel.textContent = tool === 'eraser' ? 'Erase mode:' : 'Fill mode:';
-            pencilToolLabel.style.display = tool === 'fill' ? 'none' : 'block';
             pencilToolLabel.textContent = tool === 'eraser' ? 'Eraser:' : 'Pencil:';
             smartEraserCheckbox.style.display = tool === 'eraser' ? 'flex' : 'none';
+            updatePaletteSections();
 
             canvas.style.cursor = getPaintCursor(tool, false);
 
+            lastPaintTool = tool;
+            statusEl.textContent = getPaintToolHint(tool);
+        }
+
+        // Что делать выбранным инструментом рисования (для строки статуса)
+        function getPaintToolHint(tool) {
             if (tool === 'fill') {
-                statusEl.textContent = `Tool: Fill (${fillMode})`;
-            } else if (tool === 'pencil') {
-                statusEl.textContent = 'Tool: Pencil';
-            } else {
-                statusEl.textContent = smartEraserMode ? 'Tool: Smart eraser' : 'Tool: Eraser';
+                return `Fill (${fillMode}): pick a color, then tap a molecule or a closed pencil shape`;
             }
+            if (tool === 'pencil') {
+                return 'Pencil: draw on the canvas (color and thickness - in the palette)';
+            }
+            return smartEraserMode
+                ? 'Smart eraser: tap a stroke or a fill to delete it'
+                : 'Eraser: drag over strokes and fills (tap a molecule to remove its color)';
         }
 
         // Кнопки рисования в объединённой панели инструментов
@@ -6034,6 +6828,9 @@
             let offsetY = 0;
 
             handle.addEventListener('mousedown', (e) => {
+                // Шапка палитры - и место для перетаскивания, и место кнопки закрытия.
+                // Перетаскивание - только на десктопе (на телефоне/планшете палитра - боковая панель).
+                if (e.target.closest('.close-panel') || currentLayout !== 'desktop') return;
                 isDragging = true;
                 const rect = palette.getBoundingClientRect();
                 offsetX = e.clientX - rect.left;
@@ -6589,7 +7386,8 @@
                     editStartAngle = mol.deformAngle;
                     statusEl.textContent = 'Molecule selected (mouse=move, Ctrl/Cmd=size, Shift=stretch, Alt=rotate)';
                 } else {
-                    statusEl.textContent = 'Click molecule to select';
+                    statusEl.textContent = 'Click a molecule to select it';
+                    showCreateToolHint();
                 }
             } else if (moleculeTool === 'create') {
                 // Создаем новую молекулу с размером из панели параметров
@@ -6803,12 +7601,15 @@
         });
 
         // === СТИЛУС (Apple Pencil, перо Wacom/Surface) ===
-        // Перо обрабатывается через Pointer Events. В режиме редактора оно всегда рисует
-        // (кроме выбранных ластика и заливки), толщина линии зависит от силы нажатия.
-        // Пока перо касается экрана и полсекунды после - касания пальцем/ладонью по холсту игнорируются.
+        // Перо обрабатывается через Pointer Events. В режиме редактора перо рисует линии с толщиной
+        // по силе нажатия. С выбранной заливкой: тап пером заливает, ведение пером - рисует.
+        // С ластиком перо стирает. Пока перо касается экрана и полсекунды после - касания
+        // пальцем/ладонью по холсту игнорируются.
         const PALM_REJECTION_MS = 500;
+        const PEN_TAP_TOLERANCE = 4; // px: меньше - это тап (заливка), больше - штрих
         let penActive = false;
-        let penStroke = false;   // Перо рисует карандашом (независимо от выбранного инструмента)
+        let penStroke = false;     // Перо рисует карандашом
+        let penTapPending = null;  // Заливка: точка касания, пока не ясно - тап это или штрих
         let penLastUpTime = -Infinity;
 
         function penWidth(pressure) {
@@ -6821,26 +7622,33 @@
             return penActive || performance.now() - penLastUpTime < PALM_REJECTION_MS;
         }
 
+        function startPenStroke(x, y, pressure) {
+            penStroke = true;
+            isDrawing = true;
+            currentStroke = {
+                points: [{ x, y, w: penWidth(pressure) }],
+                color: primaryColor,
+                width: pencilWidth,
+                pressure: true
+            };
+        }
+
         canvas.addEventListener('pointerdown', (e) => {
             if (e.pointerType !== 'pen' || !editorMode) return;
             // Отменяет "совместимые" mousedown/mouseup для пера - иначе штрих обработался бы дважды
             e.preventDefault();
             penActive = true;
+            penStroke = false;
+            penTapPending = null;
             canvas.setPointerCapture(e.pointerId);
 
             const { x, y } = getCanvasPoint(e.clientX, e.clientY);
-            if (currentTool === 'eraser' || currentTool === 'fill') {
-                penStroke = false;
+            if (currentTool === 'eraser') {
                 paintPointerDown(x, y);
+            } else if (currentTool === 'fill') {
+                penTapPending = { x, y, pressure: e.pressure };
             } else {
-                penStroke = true;
-                isDrawing = true;
-                currentStroke = {
-                    points: [{ x, y, w: penWidth(e.pressure) }],
-                    color: primaryColor,
-                    width: pencilWidth,
-                    pressure: true
-                };
+                startPenStroke(x, y, e.pressure);
             }
         });
 
@@ -6851,6 +7659,12 @@
             const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
             for (const ev of (events.length > 0 ? events : [e])) {
                 const { x, y } = getCanvasPoint(ev.clientX, ev.clientY);
+                if (penTapPending) {
+                    if (Math.hypot(x - penTapPending.x, y - penTapPending.y) <= PEN_TAP_TOLERANCE) continue;
+                    // Перо повели - это не тап, а линия
+                    startPenStroke(penTapPending.x, penTapPending.y, penTapPending.pressure);
+                    penTapPending = null;
+                }
                 if (penStroke && currentStroke) {
                     currentStroke.points.push({ x, y, w: penWidth(ev.pressure) });
                 } else {
@@ -6864,7 +7678,12 @@
             penActive = false;
             penLastUpTime = performance.now();
 
-            if (penStroke) {
+            if (penTapPending) {
+                // Тап пером при выбранной заливке
+                const { x, y } = penTapPending;
+                penTapPending = null;
+                paintPointerDown(x, y);
+            } else if (penStroke) {
                 penStroke = false;
                 isDrawing = false;
                 if (currentStroke && currentStroke.points.length > 1) {
@@ -6950,17 +7769,16 @@
                         // Начинаем перемещение
                         touchedMolecule.isGrabbed = true;
                         moveMoleculeTo(touchedMolecule, x, y);
-                    } else if (moleculeTool === 'create' || (moleculeTool === 'select' && !editorMode)) {
-                        // Касание пустого места создаёт молекулу (в режиме жестов - и с инструментом Select)
-                        if (moleculeTool === 'select') {
-                            selectedMoleculeUI = null;
-                        }
+                    } else if (moleculeTool === 'create') {
+                        // Касание пустого места создаёт молекулу - только инструментом Create
                         touchedMolecule = createMoleculeAt(x, y);
                         if (touchedMolecule) {
                             statusEl.textContent = `Molecule created | ${molecules.length}/${maxMolecules}`;
                         }
                     } else if (moleculeTool === 'select') {
+                        // Инструмент Select касанием пустого места только снимает выделение
                         selectedMoleculeUI = null;
+                        showCreateToolHint();
                     }
                 } else if (touches.length === 2) {
                     // Два касания - режим pinch-to-zoom
@@ -7094,29 +7912,21 @@
             console.log('Запускаем анимацию...');
             animate();
 
-            console.log('Запрашиваем доступ к камере и микрофону...');
+            // Модель жестов, камера и микрофон загружаются параллельно и не блокируют приложение:
+            // мышь, касания и редактор работают сразу, прогресс показывает карточка #engineCard
+            startHandsEngine();
             const [camera, audio] = await Promise.all([
                 setupCamera(),
                 setupAudio()
             ]);
 
-            console.log('Результаты инициализации - Камера:', camera, 'Аудио:', audio);
-
-            loading.style.display = 'none';
+            console.log('Результаты инициализации - Камера:', !!camera, 'Аудио:', audio);
 
             if (camera) {
-                detectHands();
-            }
-
-            // Если камеры нет, setupCamera() уже вывел конкретную причину - не перетираем её
-            if (camera && !handsDetector) {
-                statusEl.textContent = 'Hand tracking unavailable (MediaPipe failed to load) - mouse/touch only';
-            } else if (camera && audio) {
-                console.log('✅ ВСЁ УСПЕШНО ИНИЦИАЛИЗИРОВАНО');
-                statusEl.textContent = 'Gesture mode | Ready';
-            } else if (camera) {
-                statusEl.textContent = 'Running without sound';
+                startDetectionLoop();
+                statusEl.textContent = audio ? 'Gesture mode | Ready' : 'Running without sound';
             } else if (statusEl.textContent === 'Loading...') {
+                // Если камеры нет, setupCamera() уже вывел конкретную причину - не перетираем её
                 statusEl.textContent = 'Running without camera';
             }
 

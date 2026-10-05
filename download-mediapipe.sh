@@ -3,9 +3,10 @@
 # Скрипт для скачивания MediaPipe файлов локально
 # Это устраняет проблемы с CORS и ускоряет загрузку
 #
-# ВАЖНО: версии должны совпадать с версиями hands.js / face_mesh.js в public/index.html.
-# JS-обёртка и WASM/модели одной версии работают только вместе. Если меняете версию здесь -
-# поменяйте её и в index.html, а также увеличьте CACHE_NAME в public/service-worker.js.
+# Скачиваются и JS-обёртки (hands.js, face_mesh.js), и WASM/модели одной версии - они работают
+# только вместе. Приложение берёт всё с нашего сервера, CDN во время работы не используется.
+# После обновления: проверьте размеры файлов в HANDS_ASSETS / FACE_ASSETS в public/index.html
+# (по ним считается прогресс загрузки) и увеличьте CACHE_NAME в public/service-worker.js.
 
 set -euo pipefail
 
@@ -28,6 +29,7 @@ echo "=== Скачивание MediaPipe Hands ${HANDS_VERSION} ==="
 
 HANDS_URL="https://cdn.jsdelivr.net/npm/@mediapipe/hands@${HANDS_VERSION}"
 for file in \
+  hands.js \
   hands_solution_simd_wasm_bin.wasm \
   hands_solution_simd_wasm_bin.js \
   hands_solution_packed_assets_loader.js \
@@ -43,6 +45,7 @@ echo "=== Скачивание MediaPipe FaceMesh ${FACE_MESH_VERSION} ==="
 
 FACE_MESH_URL="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${FACE_MESH_VERSION}"
 for file in \
+  face_mesh.js \
   face_mesh_solution_simd_wasm_bin.wasm \
   face_mesh_solution_simd_wasm_bin.js \
   face_mesh_solution_packed_assets_loader.js \

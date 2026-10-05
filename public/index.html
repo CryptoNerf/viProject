@@ -5038,11 +5038,13 @@
                         break;
                     case 'result':
                         workerBusy = false;
+                        noteWorkerFrameDone(false);
                         handleWorkerResult(message);
                         break;
                     case 'error':
                         if (message.stage === 'frame') {
                             workerBusy = false;
+                            noteWorkerFrameDone(true, message.message);
                             workerFrameErrors++;
                             if (workerFrameErrors <= 5) console.error('❌ Ошибка распознавания кадра:', message.message);
                         } else if (message.stage === 'init-face') {
@@ -5081,23 +5083,118 @@
             }
         }
 
-        // Отправка кадра камеры в воркер. createImageBitmap копирует кадр без блокировки отрисовки,
-        // а передача bitmap в воркер (transfer) - без копирования.
+        // === ЗАХВАТ КАДРА КАМЕРЫ ДЛЯ ВОРКЕРА ===
+        // Скорость способов захвата сильно зависит от браузера: в Chrome на компьютере createImageBitmap(video)
+        // занимает доли миллисекунды, а в WebKit (Safari и Chrome на iPad/iPhone) может копировать кадр
+        // через процессор сотни миллисекунд - на iPad распознавание было 4 раза/с при 26 мс на саму нейросеть.
+        // Поэтому при запуске каждый доступный способ пробуется на нескольких кадрах и дальше используется
+        // самый быстрый. Принудительно: ?capture=videoframe|bitmap|canvas (для диагностики).
+        const CAPTURE_PROBE_FRAMES = 8;
+        const CAPTURE_WARMUP_FRAMES = 2; // Первые кадры каждого способа медленнее (прогрев) - не учитываем
+        const forcedCapture = (location.search.match(/[?&]capture=(videoframe|bitmap|canvas)\b/) || [])[1];
+        let captureMethods = forcedCapture
+            ? [forcedCapture]
+            : ['videoframe', 'bitmap', 'canvas'].filter(m => m !== 'videoframe' || typeof VideoFrame === 'function');
+        const captureStats = {};      // метод -> { samples, avgMs }
+        let captureMethod = captureMethods[0];
+        let captureProbing = captureMethods.length > 1;
+        let captureCanvas = null;
+        let captureCtx = null;
+        let workerRoundTripMsAvg = 0;
+        let workerFramesSent = 0;
+
+        function captureFrame(method) {
+            if (method === 'videoframe') {
+                return new VideoFrame(video, { timestamp: Math.round(performance.now() * 1000) });
+            }
+            if (method === 'bitmap') {
+                return createImageBitmap(video);
+            }
+            // canvas: отрисовка кадра на холст (на GPU) и передача его содержимого без копирования
+            const w = video.videoWidth;
+            const h = video.videoHeight;
+            if (!captureCanvas || captureCanvas.width !== w || captureCanvas.height !== h) {
+                captureCanvas = new OffscreenCanvas(w, h);
+                captureCtx = captureCanvas.getContext('2d');
+            }
+            captureCtx.drawImage(video, 0, 0, w, h);
+            return captureCanvas.transferToImageBitmap();
+        }
+
+        // Время захвата (+ время до ответа воркера на этот кадр): по нему выбираем способ
+        function noteCaptureTime(method, ms) {
+            const stat = captureStats[method] || (captureStats[method] = { samples: 0, avgMs: 0 });
+            stat.samples++;
+            if (stat.samples <= CAPTURE_WARMUP_FRAMES) return;
+            const measured = stat.samples - CAPTURE_WARMUP_FRAMES;
+            stat.avgMs = measured === 1 ? ms : stat.avgMs + (ms - stat.avgMs) / measured; // Среднее арифметическое
+            if (!captureProbing || stat.samples < CAPTURE_PROBE_FRAMES) return;
+
+            const untested = captureMethods.find(m => !captureStats[m]);
+            if (untested) {
+                captureMethod = untested;
+                return;
+            }
+            // Все способы опробованы - оставляем самый быстрый
+            captureProbing = false;
+            captureMethod = captureMethods.reduce((best, m) => captureStats[m].avgMs < captureStats[best].avgMs ? m : best);
+            console.log('Захват кадра для распознавания:', captureMethod,
+                Object.fromEntries(captureMethods.map(m => [m, `${captureStats[m].avgMs.toFixed(1)} мс`])));
+        }
+
+        // Способ не работает в этом браузере - исключаем
+        function dropCaptureMethod(method, reason) {
+            if (captureMethods.length <= 1 || !captureMethods.includes(method)) return;
+            console.warn(`Захват кадра "${method}" не работает:`, reason);
+            captureMethods = captureMethods.filter(m => m !== method);
+            delete captureStats[method];
+            if (captureMethod === method) {
+                captureMethod = captureMethods.find(m => !captureStats[m]) || captureMethods[0];
+            }
+            if (captureMethods.every(m => captureStats[m] && captureStats[m].samples >= CAPTURE_PROBE_FRAMES)) {
+                captureProbing = false;
+            }
+        }
+
+        // Отправка кадра камеры в воркер. Захваченный кадр передаётся в воркер без копирования (transfer).
+        let pendingFrameMethod = null;
+        let pendingFrameStart = 0;
+
         function sendFrameToWorker(now) {
             const worker = visionWorker;
             workerBusy = true;
             const wantFace = workerFaceReady && now - lastFaceDetectTime >= FACE_DETECT_INTERVAL_MS;
             if (wantFace) lastFaceDetectTime = now;
 
-            createImageBitmap(video).then((bitmap) => {
+            const method = captureMethod;
+            const start = performance.now();
+            Promise.resolve().then(() => captureFrame(method)).then((image) => {
                 if (worker !== visionWorker) {
-                    bitmap.close();
+                    image.close();
                     return;
                 }
-                worker.postMessage({ type: 'frame', bitmap, timestamp: now, face: wantFace }, [bitmap]);
-            }).catch(() => {
+                pendingFrameMethod = method;
+                pendingFrameStart = start;
+                workerFramesSent++;
+                worker.postMessage({ type: 'frame', bitmap: image, timestamp: now, face: wantFace }, [image]);
+            }).catch((error) => {
                 workerBusy = false;
+                dropCaptureMethod(method, error && error.message);
             });
+        }
+
+        // Ответ воркера на кадр: полное время "захват + передача + распознавание + ответ"
+        function noteWorkerFrameDone(failed, errorMessage) {
+            const method = pendingFrameMethod;
+            pendingFrameMethod = null;
+            if (!method) return;
+            if (failed) {
+                dropCaptureMethod(method, errorMessage);
+                return;
+            }
+            const totalMs = performance.now() - pendingFrameStart;
+            workerRoundTripMsAvg = workerRoundTripMsAvg * 0.8 + totalMs * 0.2;
+            noteCaptureTime(method, totalMs);
         }
 
         // Камера не нужна - не тратим трафик на модели
@@ -5614,6 +5711,7 @@
             hud.hidden = false;
             let lastFrames = 0;
             let lastResults = 0;
+            let lastSent = 0;
             let lastTime = performance.now();
             setInterval(() => {
                 const now = performance.now();
@@ -5625,9 +5723,15 @@
                 lastTime = now;
                 const track = currentStream && currentStream.getVideoTracks()[0];
                 const settings = track && track.getSettings ? track.getSettings() : {};
+                const sentFps = (workerFramesSent - lastSent) / seconds;
+                lastSent = workerFramesSent;
+                const probes = Object.entries(captureStats).map(([m, st]) => `${m} ${st.avgMs.toFixed(0)}`).join(', ');
                 hud.textContent =
                     `screen ${renderFps.toFixed(0)} fps | hands ${detectFps.toFixed(0)}/s, ${handsDetectMsAvg.toFixed(0)} ms\n` +
-                    `engine ${engineKind || engineState} | camera ${settings.width || '?'}x${settings.height || '?'} | ${currentLayout}`;
+                    `engine ${engineKind || engineState} | camera ${settings.width || '?'}x${settings.height || '?'} | ${currentLayout}\n` +
+                    (workerHandsReady
+                        ? `capture ${captureMethod}${captureProbing ? ' (testing)' : ''} | frame total ${workerRoundTripMsAvg.toFixed(0)} ms | sent ${sentFps.toFixed(0)}/s\n[${probes}]`
+                        : '');
             }, 1000);
         }
 
@@ -6287,6 +6391,7 @@
         // (Раньше был жёсткий предел 20 раз/с - вместе с распознаванием лица в том же цикле
         // это давало 10-15 неравномерных обновлений в секунду.)
         const MOBILE_MIN_DETECT_INTERVAL_MS = 33;
+        const WORKER_MIN_FRAME_INTERVAL_MS = 32; // ~30 кадров/с в воркер
         const MOBILE_MAX_DETECT_INTERVAL_MS = 66;
         let handsDetectMsAvg = 20;
         let lastDetectTime = 0;
@@ -6313,9 +6418,11 @@
             const throttled = now - lastDetectTime < getDetectInterval();
 
             if (workerHandsReady) {
-                // Воркер: следующий кадр - как только освободится. Распознавание идёт в отдельном
-                // потоке и не задерживает отрисовку, поэтому дополнительный лимит частоты не нужен.
-                if (!workerBusy && hasNewFrame && !cameraSwitching) {
+                // Воркер: следующий кадр - как только освободится, но не чаще 30 раз/с.
+                // Счётчик новых кадров (getVideoPlaybackQuality) здесь не используем: в WebKit он может
+                // считать не каждый кадр камеры, а повтор кадра в воркере ничего не тормозит.
+                const videoReady = video.readyState >= video.HAVE_CURRENT_DATA && video.videoWidth > 0;
+                if (!workerBusy && videoReady && now - lastDetectTime >= WORKER_MIN_FRAME_INTERVAL_MS && !cameraSwitching) {
                     lastVideoFrameKey = frameKey;
                     lastDetectTime = now;
                     sendFrameToWorker(now);

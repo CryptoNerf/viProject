@@ -4255,6 +4255,123 @@
             };
         }
 
+        // === ПЛАВНОЕ ДВИЖЕНИЕ РУК ===
+        // Распознавание на телефонах и планшетах идёт 10-25 раз в секунду, а экран обновляется 60 раз.
+        // Раньше рука рисовалась там, где её нашло последнее распознавание: курсор 3 кадра из 4 стоял
+        // на месте, а потом прыгал (на ноутбуке распознавание быстрее, поэтому там это не было заметно).
+        // 1) Фильтр One Euro убирает дрожание неподвижной руки и почти не добавляет задержки
+        //    при быстром движении (Casiez, Roussel, Vogel, 2012).
+        // 2) Между распознаваниями положение продолжается по последней скорости (не дальше одного
+        //    интервала) и мягко догоняет новые данные - движение на экране непрерывное.
+        class OneEuroFilter {
+            constructor(minCutoff, beta, derivativeCutoff = 1.0) {
+                this.minCutoff = minCutoff;   // Гц: сглаживание неподвижной руки (меньше - сильнее)
+                this.beta = beta;             // Насколько быстро фильтр "отпускает" при движении
+                this.derivativeCutoff = derivativeCutoff;
+                this.reset();
+            }
+
+            static alpha(cutoff, dt) {
+                const tau = 1 / (2 * Math.PI * cutoff);
+                return 1 / (1 + tau / dt);
+            }
+
+            reset() {
+                this.value = null;
+                this.derivative = 0;
+                this.time = null;
+            }
+
+            filter(value, timeSeconds) {
+                if (this.value === null) {
+                    this.value = value;
+                    this.time = timeSeconds;
+                    return value;
+                }
+                const dt = Math.max(1e-3, timeSeconds - this.time);
+                this.time = timeSeconds;
+                const rawDerivative = (value - this.value) / dt;
+                this.derivative += OneEuroFilter.alpha(this.derivativeCutoff, dt) * (rawDerivative - this.derivative);
+                const cutoff = this.minCutoff + this.beta * Math.abs(this.derivative);
+                this.value += OneEuroFilter.alpha(cutoff, dt) * (value - this.value);
+                return this.value;
+            }
+        }
+
+        const HAND_FILTER_MIN_CUTOFF = 1.0;   // Гц
+        const HAND_FILTER_BETA = 0.05;        // Координаты в пикселях экрана (подобрано замерами: дрожание vs задержка)
+        const HAND_DISPLAY_SMOOTHING_MS = 30; // Постоянная времени догоняющего сглаживания на экране
+        const HAND_PREDICTION_MAX_MS = 100;   // Дальше этого положение не "угадываем"
+
+        function createHandMotion() {
+            return {
+                filterX: new OneEuroFilter(HAND_FILTER_MIN_CUTOFF, HAND_FILTER_BETA),
+                filterY: new OneEuroFilter(HAND_FILTER_MIN_CUTOFF, HAND_FILTER_BETA),
+                active: false,
+                sampleX: 0, sampleY: 0, sampleTime: 0,
+                vx: 0, vy: 0,          // px/мс
+                interval: 50,          // Средний интервал между распознаваниями, мс
+                displayX: 0, displayY: 0, displayTime: 0
+            };
+        }
+
+        const handMotion = Array.from({ length: MAX_HAND_SLOTS }, createHandMotion);
+
+        // Новое положение руки из распознавания. Возвращает отфильтрованную точку.
+        function addHandSample(slot, x, y, now) {
+            const m = handMotion[slot];
+            const isNew = !m.active || now - m.sampleTime > HAND_LOST_RESET_MS;
+            if (isNew) {
+                m.filterX.reset();
+                m.filterY.reset();
+            }
+            const fx = m.filterX.filter(x, now / 1000);
+            const fy = m.filterY.filter(y, now / 1000);
+
+            if (isNew) {
+                // Рука появилась: без интерполяции от старого места
+                m.vx = 0;
+                m.vy = 0;
+                m.interval = 50;
+                m.displayX = fx;
+                m.displayY = fy;
+                m.displayTime = now;
+            } else {
+                const dt = Math.max(1, now - m.sampleTime);
+                m.vx = m.vx * 0.5 + ((fx - m.sampleX) / dt) * 0.5;
+                m.vy = m.vy * 0.5 + ((fy - m.sampleY) / dt) * 0.5;
+                m.interval = m.interval * 0.8 + Math.min(dt, 200) * 0.2;
+            }
+
+            m.sampleX = fx;
+            m.sampleY = fy;
+            m.sampleTime = now;
+            m.active = true;
+            return { x: fx, y: fy };
+        }
+
+        // Положение рук для текущего кадра экрана. Вызывается в animate() до всей логики жестов,
+        // поэтому и курсор, и захваченная ладонью молекула двигаются плавно.
+        function updateHandDisplayPositions(now) {
+            for (const hand of hands) {
+                const m = handMotion[hand.slot];
+                if (!m || !m.active) continue;
+
+                const ahead = Math.min(now - m.sampleTime, m.interval, HAND_PREDICTION_MAX_MS);
+                const targetX = m.sampleX + m.vx * ahead;
+                const targetY = m.sampleY + m.vy * ahead;
+
+                const dt = Math.max(0, now - m.displayTime);
+                const k = 1 - Math.exp(-dt / HAND_DISPLAY_SMOOTHING_MS);
+                m.displayX += (targetX - m.displayX) * k;
+                m.displayY += (targetY - m.displayY) * k;
+                m.displayTime = now;
+
+                hand.x = m.displayX;
+                hand.y = m.displayY;
+            }
+        }
+
         // Обработка результатов MediaPipe
         let frameCount = 0;
 
@@ -4337,8 +4454,13 @@
                     const remapY = Math.max(0, Math.min(1, (palm.y - edgeMargin) / (1 - 2 * edgeMargin)));
 
                     // Фронтальная камера отзеркалена (как зеркало), основная - нет
-                    const handX = (mirrorCamera ? 1 - remapX : remapX) * width;
-                    const handY = remapY * height;
+                    const rawX = (mirrorCamera ? 1 - remapX : remapX) * width;
+                    const rawY = remapY * height;
+
+                    // Отфильтрованная точка (без дрожания) - для логики жестов в этом кадре
+                    const filtered = addHandSample(slot, rawX, rawY, performance.now());
+                    const handX = filtered.x;
+                    const handY = filtered.y;
 
                     // УЛУЧШЕНО: Используем приоритетную систему жестов (стабилизация - по слоту руки)
                     const gestureResult = getPrimaryGesture(landmarks, slot);
@@ -4358,10 +4480,12 @@
                         (landmarks[4].y - landmarks[20].y) ** 2
                     );
 
+                    // x/y - плавное положение для экрана, его обновляет каждый кадр updateHandDisplayPositions()
+                    const motion = handMotion[slot];
                     const handData = {
                         slot,
-                        x: handX,
-                        y: handY,
+                        x: motion.displayX,
+                        y: motion.displayY,
                         isPinching,
                         isOpen,
                         isFist,
@@ -4816,8 +4940,8 @@
                             mouthOpenFrames = 0;
                         }
 
-                        // Рот считается открытым, если был открыт 2 кадра лица подряд (~0.2 с:
-                        // лицо распознаётся ~10 раз в секунду, см. FACE_EVERY_N)
+                        // Рот считается открытым, если был открыт 2 кадра лица подряд (~0.3 с:
+                        // лицо распознаётся ~7 раз в секунду, см. FACE_DETECT_INTERVAL_MS)
                         isMouthOpen = mouthOpenFrames >= 2;
 
                         // TOGGLE режима редактирования при открытии рта
@@ -4863,11 +4987,12 @@
             }
         }
 
-        // Инициализация камеры
-        const BASE_VIDEO_CONSTRAINTS = {
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-        };
+        // Инициализация камеры.
+        // На телефонах и планшетах - 640×480: нейросеть всё равно уменьшает кадр до ~224 px, а передача
+        // кадра 1280×720 в видеокарту телефона заметно дороже и снижает частоту распознавания.
+        const BASE_VIDEO_CONSTRAINTS = isMobile
+            ? { width: { ideal: 640 }, height: { ideal: 480 } }
+            : { width: { ideal: 1280 }, height: { ideal: 720 } };
         let currentStream = null;
         let cameraFacing = 'user';     // 'user' - фронтальная, 'environment' - основная (задняя)
         let mirrorCamera = true;       // Фронтальная камера показывается зеркально, основная - как есть
@@ -5285,6 +5410,9 @@
             if (config.audioEnabled && !editorMode) {
                 analyzeAudio();
             }
+
+            // Плавное положение рук между кадрами распознавания (до всей логики жестов)
+            updateHandDisplayPositions(performance.now());
 
             // Фиксация с таймером
             const fists = hands.filter(h => h.isFist);
@@ -5908,7 +6036,6 @@
         // Распознаём только НОВЫЕ кадры камеры: камера даёт 15-30 кадров/с, а цикл requestAnimationFrame
         // крутится 60 раз/с - раньше до 2/3 работы нейросети уходило на повтор того же кадра.
         let detectLoopRunning = false;
-        let sendCount = 0;
         let detectErrorCount = 0;
         let lastVideoFrameKey = -1;
 
@@ -5919,11 +6046,24 @@
             return quality && quality.totalVideoFrames > 0 ? quality.totalVideoFrames : video.currentTime;
         }
 
-        // Экономный режим на телефонах и планшетах: распознаём руки не чаще ~20 раз в секунду.
-        // Лицо (детектор открытого рта) - примерно 10 раз в секунду на всех устройствах.
-        const MOBILE_DETECT_INTERVAL_MS = 50;
-        const FACE_EVERY_N = isMobile ? 2 : 3;
+        // Частота распознавания рук на телефонах и планшетах подстраивается под скорость устройства:
+        // интервал = 1.5 × среднее время распознавания, но не чаще ~30 и не реже ~15 раз в секунду.
+        // Быстрый iPad распознаёт каждый кадр камеры, слабый телефон не перегревается.
+        // (Раньше был жёсткий предел 20 раз/с - вместе с распознаванием лица в том же цикле
+        // это давало 10-15 неравномерных обновлений в секунду.)
+        const MOBILE_MIN_DETECT_INTERVAL_MS = 33;
+        const MOBILE_MAX_DETECT_INTERVAL_MS = 66;
+        let handsDetectMsAvg = 20;
         let lastDetectTime = 0;
+
+        // Лицо (детектор открытого рта) - по таймеру ~7 раз в секунду на всех устройствах
+        const FACE_DETECT_INTERVAL_MS = 150;
+        let lastFaceDetectTime = 0;
+
+        function getDetectInterval() {
+            if (!isMobile) return 0;
+            return Math.max(MOBILE_MIN_DETECT_INTERVAL_MS, Math.min(MOBILE_MAX_DETECT_INTERVAL_MS, handsDetectMsAvg * 1.5));
+        }
 
         function startDetectionLoop() {
             if (detectLoopRunning) return;
@@ -5935,16 +6075,19 @@
             const now = performance.now();
             const frameKey = getVideoFrameKey();
             const hasNewFrame = video.readyState >= video.HAVE_CURRENT_DATA && frameKey !== lastVideoFrameKey;
-            const throttled = isMobile && now - lastDetectTime < MOBILE_DETECT_INTERVAL_MS;
+            const throttled = now - lastDetectTime < getDetectInterval();
 
             if (handsDetector && hasNewFrame && !throttled && !cameraSwitching) {
                 lastVideoFrameKey = frameKey;
                 lastDetectTime = now;
-                sendCount++;
                 try {
+                    const handsStart = performance.now();
                     await handsDetector.send({ image: video });
+                    handsDetectMsAvg = handsDetectMsAvg * 0.9 + (performance.now() - handsStart) * 0.1;
+
                     // FaceMesh опционально - не блокирует работу рук
-                    if (faceMeshReady && faceMesh && sendCount % FACE_EVERY_N === 0) {
+                    if (faceMeshReady && faceMesh && now - lastFaceDetectTime >= FACE_DETECT_INTERVAL_MS) {
+                        lastFaceDetectTime = now;
                         try {
                             await faceMesh.send({ image: video });
                         } catch {

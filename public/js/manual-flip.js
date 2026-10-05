@@ -89,7 +89,7 @@ const translations = {
       },
       keyboard: {
         title: 'KEYBOARD SHORTCUTS',
-        html: '<div style="font-size: 20px; line-height: 2;"><strong>Ctrl+C</strong> → Copy selected molecule<br><strong>Ctrl+V</strong> → Paste copied molecule<br><strong>Ctrl+Z</strong> → Undo last action<br><strong>Ctrl+Shift+Z</strong> → Redo<br><strong>Delete</strong> → Delete selected molecule<br><small>On Mac: Cmd instead of Ctrl</small></div>',
+        html: '<div class="page-text page-text-keys"><strong>Ctrl+C</strong> → Copy selected molecule<br><strong>Ctrl+V</strong> → Paste copied molecule<br><strong>Ctrl+Z</strong> → Undo last action<br><strong>Ctrl+Shift+Z</strong> → Redo<br><strong>Delete</strong> → Delete selected molecule<br><small>On Mac: Cmd instead of Ctrl</small></div>',
         func: 'Quick actions using keyboard'
       }
     },
@@ -169,7 +169,7 @@ const translations = {
       },
       keyboard: {
         title: 'КЛАВИАТУРНЫЕ СОКРАЩЕНИЯ',
-        html: '<div style="font-size: 20px; line-height: 2;"><strong>Ctrl+C</strong> → Копировать выбранную молекулу<br><strong>Ctrl+V</strong> → Вставить скопированную молекулу<br><strong>Ctrl+Z</strong> → Отменить последнее действие<br><strong>Ctrl+Shift+Z</strong> → Повторить<br><strong>Delete</strong> → Удалить выбранную молекулу<br><small>На Mac: Cmd вместо Ctrl</small></div>',
+        html: '<div class="page-text page-text-keys"><strong>Ctrl+C</strong> → Копировать выбранную молекулу<br><strong>Ctrl+V</strong> → Вставить скопированную молекулу<br><strong>Ctrl+Z</strong> → Отменить последнее действие<br><strong>Ctrl+Shift+Z</strong> → Повторить<br><strong>Delete</strong> → Удалить выбранную молекулу<br><small>На Mac: Cmd вместо Ctrl</small></div>',
         func: 'Быстрые действия с помощью клавиатуры'
       }
     },
@@ -198,7 +198,7 @@ function getManualPages(lang) {
     },
     {
       title: t.welcome.title,
-      html: `<div style="font-size: 18px; line-height: 1.8; text-align: left;">${t.welcome.text}</div>`
+      html: `<div class="page-text">${t.welcome.text}</div>`
     },
     {
       title: t.gestures.create.title,
@@ -267,13 +267,12 @@ function getManualPages(lang) {
       title: t.gestures.keyboard.title,
       html: t.gestures.keyboard.html,
       func: t.gestures.keyboard.func,
-      image: 'img/manual/keyboard2.png',
-      imageHeight: '150px'
+      image: 'img/manual/keyboard2.png'
     },
     // Финальная страница
     {
       title: t.finalPage.title,
-      html: `<div style="font-size: 18px; line-height: 1.8; text-align: left;">${t.finalPage.text}</div>`,
+      html: `<div class="page-text">${t.finalPage.text}</div>`,
       image: 'img/manual/Emile.png'
     },
     // Задняя обложка
@@ -341,7 +340,7 @@ function createManualPageHTML(pageData, index, total) {
           ${
             pageData.image
               ? `
-          <div class="gesture-image" style="${pageData.imageHeight ? `min-height:${pageData.imageHeight}` : ''}">
+          <div class="gesture-image">
             <img src="${pageData.image}" alt="${pageData.title}">
           </div>
           `
@@ -353,56 +352,83 @@ function createManualPageHTML(pageData, index, total) {
   `;
 }
 
-// Вычисление размеров книги
+// Вычисление размеров книги по реально доступному месту.
+// Раньше окна ноутбуков высотой <= 768px попадали в "мобильную" ветку (по min(ширина, высота)),
+// книга получалась мелкой, а текст с фиксированными размерами в пикселях обрезался снизу.
+const PAGE_ASPECT = 1.4;          // Высота страницы / ширина
+const BUTTONS_RESERVE = 72;       // Место над книгой под кнопки "назад" и "язык"
+const SIDE_SPACE_FOR_BUTTONS = 80; // Если по бокам от книги столько места - кнопки не мешают
+const EDGE_GAP = 12;
+
+// Вертикальный экран (телефон, планшет в портрете): одна страница вместо разворота
+function isPortraitLayout() {
+  return window.innerWidth < window.innerHeight * 0.9;
+}
+
+function fitBook(vw, vh, pagesAcross, topReserve) {
+  const maxHeight = vh - topReserve - EDGE_GAP;
+  const maxWidth = (vw * 0.94) / pagesAcross;
+  const height = Math.floor(Math.max(200, Math.min(maxHeight, maxWidth * PAGE_ASPECT, 1200)));
+  return { width: Math.floor(height / PAGE_ASPECT), height, topReserve };
+}
+
 function calculateManualBookDimensions() {
-  let vw = window.innerWidth;
-  let vh = window.innerHeight;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const pagesAcross = isPortraitLayout() ? 1 : 2;
 
-  const topOffset = 80;
-  const bottomOffset = 40;
-  const availableHeight = vh - topOffset - bottomOffset;
-
-  const originalWidth = Math.min(window.innerWidth, window.innerHeight);
-
-  let pageWidth, pageHeight;
-
-  if (originalWidth <= 768) {
-    // мобильный
-    const mobileAvailableHeight = vh - 100;
-    pageHeight = Math.floor(mobileAvailableHeight * 0.85);
-    pageWidth = Math.floor(pageHeight / 1.4);
-    const maxWidth = Math.floor(vw * 0.42);
-    if (pageWidth > maxWidth) {
-      pageWidth = maxWidth;
-      pageHeight = Math.floor(pageWidth * 1.4);
-    }
-  } else if (originalWidth <= 1024) {
-    // планшет
-    const heightPercent = 0.92;
-    const maxWidthPercent = 0.45;
-    pageHeight = Math.floor(availableHeight * heightPercent);
-    pageWidth = Math.floor(pageHeight / 1.4);
-    const maxWidth = Math.floor(vw * maxWidthPercent);
-    if (pageWidth > maxWidth) {
-      pageWidth = maxWidth;
-      pageHeight = Math.floor(pageWidth * 1.4);
-    }
-  } else {
-    // десктоп
-    const heightPercent = 0.92;
-    const maxWidthPercent = 0.45;
-    pageHeight = Math.floor(availableHeight * heightPercent);
-    pageWidth = Math.floor(pageHeight / 1.4);
-    const maxWidth = Math.floor(vw * maxWidthPercent);
-    if (pageWidth > maxWidth) {
-      pageWidth = maxWidth;
-      pageHeight = Math.floor(pageWidth * 1.4);
-    }
-    if (pageWidth < 400) pageWidth = 400;
-    if (pageHeight < 560) pageHeight = 560;
+  // Сначала пробуем занять всю высоту: на широких экранах кнопки стоят в углах сбоку от книги
+  const tall = fitBook(vw, vh, pagesAcross, EDGE_GAP);
+  const sideSpace = (vw - tall.width * pagesAcross) / 2;
+  if (sideSpace >= SIDE_SPACE_FOR_BUTTONS) {
+    return tall;
   }
+  // Иначе оставляем полосу сверху под кнопки
+  return fitBook(vw, vh, pagesAcross, BUTTONS_RESERVE);
+}
 
-  return { width: pageWidth, height: pageHeight };
+// Подгоняет размер шрифта страницы, чтобы всё содержимое помещалось без обрезки.
+// Все размеры внутри страниц в manual.css заданы в em, поэтому масштабируются вместе со шрифтом.
+// Базовый размер растёт с высотой страницы (на больших мониторах текст крупнее).
+// Шрифт ставится на .page-inner: inline-стили самого .page перезаписывает StPageFlip.
+const MIN_READABLE_FONT = 10;
+
+function fitPagesToSize(pages, width, height) {
+  const baseFont = Math.max(MIN_READABLE_FONT, Math.min(24, (height / 680) * 16));
+
+  for (const page of pages) {
+    page.style.width = `${width}px`;
+    page.style.height = `${height}px`;
+
+    const inner = page.querySelector('.page-inner');
+    const content = page.querySelector('.page-content');
+    const overflows = () => content.scrollHeight > content.clientHeight + 1;
+    const shrinkTo = (minFont) => {
+      let fontSize = baseFont;
+      inner.style.fontSize = `${fontSize}px`;
+      while (fontSize > minFont && overflows()) {
+        fontSize -= 0.5;
+        inner.style.fontSize = `${fontSize}px`;
+      }
+    };
+
+    page.classList.remove('page-compact', 'page-scroll');
+    shrinkTo(MIN_READABLE_FONT);
+
+    // Очень низкая страница (телефон горизонтально): сначала убираем иллюстрацию,
+    // если и это не помогло - разрешаем прокрутку текста внутри страницы
+    if (overflows()) {
+      page.classList.add('page-compact');
+      shrinkTo(MIN_READABLE_FONT);
+    }
+    if (overflows()) {
+      page.classList.add('page-scroll');
+    }
+
+    // Размеры дальше задаёт StPageFlip
+    page.style.width = '';
+    page.style.height = '';
+  }
 }
 
 // Глобальные переменные для книги
@@ -438,8 +464,14 @@ function renderBook(lang, savedPage = 0) {
   bookWrapper.appendChild(newBookElement);
 
   const totalPages = manualPages.length;
-  const { width, height } = calculateManualBookDimensions();
+  const { width, height, topReserve } = calculateManualBookDimensions();
   lastBookSize = `${width}x${height}`;
+  // Книга центрируется в области под полосой кнопок
+  bookWrapper.style.paddingTop = `${topReserve}px`;
+  bookWrapper.style.paddingBottom = `${EDGE_GAP}px`;
+
+  const pageElements = newBookElement.querySelectorAll('.page');
+  fitPagesToSize(pageElements, width, height);
 
   pageFlip = new St.PageFlip(newBookElement, {
     width,
@@ -449,7 +481,7 @@ function renderBook(lang, savedPage = 0) {
     mobileScrollSupport: true,
     swipeDistance: 30,
     clickEventForward: true,
-    usePortrait: false,
+    usePortrait: true, // Если разворот не помещается по ширине - показываем по одной странице
     startPage: savedPage,
     drawShadow: false,
     flippingTime: 800,
@@ -459,7 +491,7 @@ function renderBook(lang, savedPage = 0) {
     disableFlipByClick: false
   });
 
-  pageFlip.loadFromHTML(document.querySelectorAll('#book .page'));
+  pageFlip.loadFromHTML(pageElements);
 
   currentPage = savedPage;
 
@@ -468,10 +500,12 @@ function renderBook(lang, savedPage = 0) {
     const stfWrapper = newBookElement.querySelector('.stf__wrapper');
     if (!stfWrapper) return;
 
-    const dims = calculateManualBookDimensions();
-    const w = dims.width;
+    const w = width;
 
-    if (currentPage === 0) {
+    // В постраничном режиме обложка и так по центру
+    if (pageFlip.getOrientation() === 'portrait') {
+      stfWrapper.style.transform = 'translateX(0)';
+    } else if (currentPage === 0) {
       stfWrapper.style.transform = `translateX(-${w / 2}px)`;
     } else if (currentPage === totalPages - 1) {
       stfWrapper.style.transform = `translateX(${w / 2}px)`;
@@ -505,8 +539,11 @@ document.addEventListener('DOMContentLoaded', () => {
     backButton.addEventListener('click', goBackToApp);
   }
 
-  // Рендерим книгу с текущим языком
-  renderBook(currentLang);
+  // Рендерим книгу с текущим языком. Ждём загрузки шрифта: от него зависит подгонка текста
+  // (иначе размер подбирался бы по запасному шрифту).
+  const fontLoad = document.fonts ? document.fonts.load('16px SysfontC').catch(() => {}) : Promise.resolve();
+  const fontTimeout = new Promise(resolve => setTimeout(resolve, 1500)); // Не ждём шрифт бесконечно
+  Promise.race([fontLoad, fontTimeout]).then(() => renderBook(currentLang, currentPage));
 
   // Обновляем текст кнопки языка
   const langText = document.getElementById('langText');

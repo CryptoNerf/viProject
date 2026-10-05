@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -30,6 +30,21 @@
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
+
+    <script>
+        // Раскладка интерфейса: phone / tablet / desktop (см. CSS "АДАПТИВНЫЕ РАСКЛАДКИ").
+        // Выставляется до отрисовки страницы, чтобы на телефоне не "мигала" десктопная версия.
+        function computeLayout() {
+            var w = window.innerWidth;
+            var h = window.innerHeight;
+            var touchFirst = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+                (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+            if (Math.min(w, h) < 600 || w < 700) return 'phone';
+            return touchFirst ? 'tablet' : 'desktop';
+        }
+        document.documentElement.dataset.layout = computeLayout();
+        document.documentElement.dataset.orientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+    </script>
 
     <style>
         @font-face {
@@ -74,6 +89,7 @@
         }
 
         #canvas {
+            touch-action: none; /* Браузер не прокручивает/масштабирует страницу пальцем или пером */
             position: absolute;
             top: 0;
             left: 0;
@@ -527,12 +543,6 @@
             right: 20px;
         }
 
-        #togglePalette {
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-
         .toggle-btn.visible {
             opacity: 1;
             pointer-events: auto;
@@ -575,255 +585,6 @@
             color: #ffffff;
             box-shadow: none;
         }
-
-        /* Скрываем кнопку закрытия палитры на десктопе */
-        #closePalette {
-            display: none;
-        }
-
-        /* Адаптация для мобильных устройств */
-        @media (max-width: 768px) {
-            #controls {
-                top: 10px;
-                right: 10px;
-                padding: 20px;
-                padding-top: 30px;
-                max-width: calc(100vw - 40px); /* Ширина почти на весь экран с отступами */
-                width: 90vw;
-                font-size: 14px; /* Увеличен для мобильных */
-                background: #ffffff;
-                max-height: 85vh;
-                overflow-y: auto;
-                -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-                scrollbar-width: thin; /* Тонкий скроллбар на Firefox */
-            }
-
-            /* Стилизация скроллбара для Webkit */
-            #controls::-webkit-scrollbar {
-                width: 4px;
-            }
-
-            #controls::-webkit-scrollbar-track {
-                background: rgba(0, 0, 0, 0.05);
-                border-radius: 2px;
-            }
-
-            #controls::-webkit-scrollbar-thumb {
-                background: rgba(0, 0, 0, 0.2);
-                border-radius: 2px;
-            }
-
-            /* Collapsed state for controls on mobile */
-            #controls.mobile-collapsed {
-                transform: translateX(calc(100% + 20px));
-                opacity: 0;
-                pointer-events: none;
-            }
-
-            h2 {
-                font-size: 20px; /* Увеличен с 14px */
-                margin-bottom: 15px;
-            }
-
-            h3 {
-                font-size: 16px; /* Для подзаголовков */
-            }
-
-            .control-group {
-                margin-bottom: 0px; /* Увеличены отступы */
-            }
-
-            label {
-                font-size: 16px; /* Увеличен с 10px */
-                line-height: 1.6;
-                margin-bottom: 0px;
-            }
-
-            button {
-                padding: 14px 18px; /* Увеличены отступы для удобного нажатия */
-                font-size: 16px; /* Увеличен с 11px */
-                margin-top: 10px;
-                min-height: 44px; /* Минимальная высота для удобного тапа */
-            }
-
-            input[type="range"] {
-                height: 32px; /* Увеличена высота слайдера */
-                margin: 8px 0;
-            }
-
-            input[type="checkbox"] {
-                width: 20px;
-                height: 20px;
-                margin-right: 10px;
-            }
-
-            /* Увеличенная галочка для мобильных */
-            input[type="checkbox"]:checked::before {
-                font-size: 18px;
-            }
-
-            .checkbox-group {
-                margin-bottom: 15px;
-            }
-
-            .checkbox-group label {
-                display: flex;
-                align-items: center;
-                cursor: pointer;
-                padding: 8px;
-            }
-
-            .gesture-hint {
-                top: 10px;
-                left: 10px;
-                padding: 15px 18px;
-                padding-top: 30px;
-                font-size: 14px; /* Увеличен для мобильных */
-                max-width: 280px;
-                background: #ffffff;
-            }
-
-            .gesture-hint div {
-                line-height: 1.6;
-                margin-bottom: 4px;
-            }
-
-            .gesture-hint strong {
-                font-size: 18px; /* Увеличен заголовок */
-            }
-
-            /* Скрываем индикатор режима на мобильных - он перекрывает меню */
-            .mode-indicator {
-                display: none !important;
-            }
-
-            .toggle-btn {
-                width: 50px; /* Увеличен с 32px */
-                height: 50px;
-                font-size: 24px; /* Увеличен с 16px */
-            }
-
-            /* Кнопки toggleHints и toggleControls ниже панелей */
-            #toggleHints, #toggleControls {
-                z-index: 9;
-            }
-
-            /* Кнопка togglePalette выше, чтобы быть видимой */
-            #togglePalette {
-                z-index: 20 !important; /* Выше всех элементов */
-                bottom: 15px;
-                left: 50%;
-                transform: translateX(-50%); /* Центрируем кнопку */
-                opacity: 1 !important; /* Принудительно видимая в режиме редактора */
-                pointer-events: auto !important; /* Принудительно кликабельная */
-            }
-
-            /* Но скрываем когда не в режиме редактора */
-            #togglePalette:not(.visible) {
-                opacity: 0 !important;
-                pointer-events: none !important;
-            }
-
-            /* Увеличиваем кнопку закрытия панелей на мобильных */
-            .close-panel {
-                width: 40px !important;
-                height: 40px !important;
-                min-width: 40px !important;
-                min-height: 40px !important;
-                font-size: 28px !important;
-                line-height: 40px !important;
-                background: #ffffff;
-            }
-
-            .close-panel:hover {
-                background: #dddddd;
-            }
-
-            /* Показываем кнопку закрытия палитры на мобильных */
-            #closePalette {
-                display: flex !important;
-            }
-
-            #toggleHints {
-                top: 10px;
-                left: 10px;
-            }
-
-            #toggleControls {
-                top: 10px;
-                right: 10px;
-            }
-
-            #status {
-                bottom: 10px;
-                left: 10px;
-                padding: 10px 14px;
-                font-size: 16px;
-            }
-
-            .audio-indicator {
-                bottom: 10px;
-                right: 10px;
-                width: 100px;
-                height: 30px;
-            }
-
-            .value-display {
-                font-size: 16px; /* Увеличен с 11px */
-                font-weight: bold;
-            }
-
-            /* Mobile-friendly color palette */
-            #colorPalette {
-                display: block !important; /* Показываем палитру на мобильных, переопределяем базовый display: none */
-                left: 50%;
-                transform: translateX(-50%);
-                width: 95%;
-                max-width: 350px;
-                padding: 8px;
-                padding-top: 25px;
-                bottom: 10px;
-                max-height: 60vh;
-                overflow-y: auto;
-                -webkit-overflow-scrolling: touch;
-                scrollbar-width: thin;
-                transition: transform 0.3s ease, opacity 0.3s ease; /* Плавная анимация */
-                pointer-events: auto !important; /* Разрешаем взаимодействие с палитрой на мобильных */
-            }
-
-            #colorPalette::-webkit-scrollbar {
-                width: 4px;
-            }
-
-            #colorPalette::-webkit-scrollbar-track {
-                background: rgba(0, 0, 0, 0.05);
-                border-radius: 2px;
-            }
-
-            #colorPalette::-webkit-scrollbar-thumb {
-                background: rgba(0, 0, 0, 0.2);
-                border-radius: 2px;
-            }
-
-            #colorPalette.mobile-collapsed {
-                transform: translateX(-50%) translateY(calc(100% + 20px));
-                opacity: 0;
-                pointer-events: none !important; /* Гарантированно блокируем взаимодействие когда скрыта */
-            }
-
-            #colorGrid {
-                grid-template-columns: repeat(10, 20px); /* Reduce from 14 to 10 columns */
-            }
-
-            .color-section {
-                margin-bottom: 6px;
-            }
-
-            .label-paint {
-                font-size: 14px;
-            }
-        }
-
 
         /* === PAINT РЕЖИМ РЕДАКТОРА === */
 
@@ -1138,43 +899,515 @@
             object-fit: contain;
         }
 
-        /* Мобильная адаптация панели инструментов */
-        @media (max-width: 768px) {
-            #toolbox {
-                top: auto;
-                bottom: 70px;
-                left: 10px;
-                transform: none;
-                padding: 8px;
-                max-height: calc(100vh - 150px);
-                overflow-y: auto;
-            }
+        /* =====================================================================
+           АДАПТИВНЫЕ РАСКЛАДКИ
+           <html data-layout="phone|tablet|desktop" data-orientation="portrait|landscape">
+           выставляет computeLayout() (скрипт в <head>) и updateLayout() при ресайзе:
+           - phone:   короткая сторона экрана < 600px или окно уже 700px;
+           - tablet:  сенсорный экран (палец - основной указатель) от 600px;
+           - desktop: всё остальное.
+           Раньше мобильные стили включались по ширине 768px, а логика панелей - по типу
+           устройства, и на планшетах/коротких окнах они расходились.
+           ===================================================================== */
 
-            #toolbox.minimized {
-                transform: translateX(calc(-100% - 10px));
-                opacity: 0;
-            }
+        [hidden] {
+            display: none !important;
+        }
 
-            .tool-btn {
-                width: 50px;
-                height: 50px;
-                font-size: 20px;
-            }
+        /* Иконки новых кнопок панели (SVG в стиле остальных иконок) */
+        .action-btn svg {
+            width: 30px;
+            height: 30px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
+        }
 
-            .tool-icon {
-                width: 40px; /* Увеличен для мобильных */
-                height: 40px;
-            }
+        .action-btn.active {
+            background: #000000;
+            color: #ffffff;
+            box-shadow: none;
+        }
 
-            .action-btn {
-                font-size: 18px;
-                padding: 8px 2px;
-            }
+        /* Десктоп: панели прокручиваются, если не помещаются по высоте
+           (на ноутбуках с низким окном нижние кнопки и раздел Export уходили за экран) */
+        #toolbox {
+            max-height: calc(100vh - 150px);
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
 
-            .action-btn img {
-                width: 28px; /* Увеличен для мобильных */
-                height: 28px;
-            }
+        #controls {
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+
+        /* Десктоп: палитра - широкая и низкая, секции в колонках. Узкая высокая колонка
+           на ноутбуках с невысоким окном закрывала середину холста. */
+        [data-layout="desktop"] #colorPalette.active {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            column-gap: 16px;
+            align-items: start;
+            width: max(480px, min(920px, calc(100vw - 680px))); /* Не заходит под панель настроек справа */
+            max-height: calc(100vh - 140px);
+            overflow-y: auto;
+        }
+
+        [data-layout="desktop"] #colorGrid {
+            grid-template-columns: repeat(auto-fill, 20px);
+        }
+
+        /* ---------- Общее для телефона и планшета ---------- */
+
+        [data-layout="phone"] #container,
+        [data-layout="tablet"] #container {
+            height: 100vh;
+            height: 100dvh; /* Без учёта выезжающей адресной строки мобильных браузеров */
+        }
+
+        [data-layout="phone"] #paletteHandle,
+        [data-layout="tablet"] #paletteHandle {
+            display: none; /* Перетаскивание палитры - только на десктопе */
+        }
+
+        /* Панели настроек и палитры - выезжающие листы, управляемые классами
+           .minimized (настройки) и .active (палитра). Видна только одна панель за раз. */
+        [data-layout="phone"] #controls,
+        [data-layout="phone"] #colorPalette,
+        [data-layout="tablet"] #controls,
+        [data-layout="tablet"] #colorPalette {
+            position: fixed;
+            display: block;
+            max-width: none;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            pointer-events: auto;
+            z-index: 30;
+            transition: transform 0.25s ease, opacity 0.25s ease;
+        }
+
+        [data-layout="phone"] #colorPalette:not(.active),
+        [data-layout="tablet"] #colorPalette:not(.active),
+        [data-layout="phone"] #controls.minimized,
+        [data-layout="tablet"] #controls.minimized {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Крупные элементы управления под палец (не меньше 44px) */
+        [data-layout="phone"] #controls button:not(.close-panel),
+        [data-layout="tablet"] #controls button:not(.close-panel) {
+            min-height: 44px;
+            font-size: 16px;
+        }
+
+        [data-layout="phone"] .close-panel,
+        [data-layout="tablet"] .close-panel {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            min-height: 40px;
+            font-size: 26px;
+            line-height: 36px;
+        }
+
+        [data-layout="phone"] input[type="range"],
+        [data-layout="tablet"] input[type="range"] {
+            height: 14px;
+            margin: 14px 0;
+        }
+
+        [data-layout="phone"] input[type="range"]::-webkit-slider-thumb,
+        [data-layout="tablet"] input[type="range"]::-webkit-slider-thumb {
+            width: 22px;
+            height: 32px;
+        }
+
+        [data-layout="phone"] input[type="range"]::-moz-range-thumb,
+        [data-layout="tablet"] input[type="range"]::-moz-range-thumb {
+            width: 22px;
+            height: 32px;
+        }
+
+        [data-layout="phone"] input[type="checkbox"],
+        [data-layout="tablet"] input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+        }
+
+        [data-layout="phone"] .checkbox-group label,
+        [data-layout="tablet"] .checkbox-group label {
+            padding: 8px 0;
+            font-size: 16px;
+        }
+
+        [data-layout="phone"] label,
+        [data-layout="tablet"] label {
+            font-size: 16px;
+        }
+
+        [data-layout="phone"] .custom-select-trigger,
+        [data-layout="phone"] .custom-option,
+        [data-layout="tablet"] .custom-select-trigger,
+        [data-layout="tablet"] .custom-option {
+            padding: 12px;
+            font-size: 16px;
+        }
+
+        [data-layout="phone"] #colorGrid,
+        [data-layout="tablet"] #colorGrid {
+            grid-template-columns: repeat(auto-fill, 34px);
+            gap: 4px;
+        }
+
+        [data-layout="phone"] .color-swatch,
+        [data-layout="tablet"] .color-swatch {
+            width: 34px;
+            height: 34px;
+        }
+
+        [data-layout="phone"] .fill-mode-btn,
+        [data-layout="tablet"] .fill-mode-btn {
+            min-height: 40px;
+            font-size: 15px;
+        }
+
+        [data-layout="phone"] #colorPalette input[type="color"],
+        [data-layout="tablet"] #colorPalette input[type="color"] {
+            min-height: 40px;
+        }
+
+        [data-layout="phone"] #colorPalette .color-section,
+        [data-layout="tablet"] #colorPalette .color-section {
+            margin-bottom: 14px;
+        }
+
+        /* ---------- Телефон ---------- */
+
+        [data-layout="phone"] {
+            /* Полная высота нижней панели (с safe-area). Точное значение выставляет JS
+               (ResizeObserver), т.к. в портретной ориентации панель может занять две строки */
+            --toolbar-h: calc(62px + env(safe-area-inset-bottom));
+        }
+
+        /* Верхние кнопки с учётом выреза экрана */
+        [data-layout="phone"] .toggle-btn {
+            width: 44px;
+            height: 44px;
+            font-size: 22px;
+        }
+
+        [data-layout="phone"] #toggleHints {
+            top: calc(10px + env(safe-area-inset-top));
+            left: calc(10px + env(safe-area-inset-left));
+        }
+
+        [data-layout="phone"] #toggleControls {
+            top: calc(10px + env(safe-area-inset-top));
+            right: calc(10px + env(safe-area-inset-right));
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Индикатор режима не нужен: режим показывает кнопка на нижней панели */
+        [data-layout="phone"] .mode-indicator {
+            display: none !important;
+        }
+
+        /* Индикатор звука - компактно сверху по центру */
+        [data-layout="phone"] .audio-indicator {
+            top: calc(18px + env(safe-area-inset-top));
+            bottom: auto;
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%);
+            width: 84px;
+            height: 28px;
+        }
+
+        /* Строка статуса - над нижней панелью */
+        [data-layout="phone"] #status {
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%);
+            bottom: calc(var(--toolbar-h) + 8px);
+            max-width: calc(100vw - 24px);
+            padding: 4px 10px;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-shadow: 2px 2px 0 #000000;
+        }
+
+        /* Нижняя панель инструментов в одну строку (прокручивается, если не помещается) */
+        [data-layout="phone"] #toolbox {
+            top: auto;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            transform: none;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 6px;
+            max-height: none;
+            padding: 6px calc(8px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+            border-width: 2px 0 0 0;
+            box-shadow: none;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
+            z-index: 20;
+        }
+
+        [data-layout="phone"] #toolbox::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Вертикально все кнопки в одну строку не помещаются: убираем группировку по секциям
+           и переносим кнопки сплошным потоком (в режиме жестов - 1 строка, в редакторе - 2),
+           чтобы ни одна не пряталась за краем экрана. Инструменты рисования - первыми. */
+        [data-layout="phone"][data-orientation="portrait"] #toolbox {
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 4px;
+            overflow-x: hidden;
+        }
+
+        [data-layout="phone"][data-orientation="portrait"] .toolbox-section:not([hidden]),
+        [data-layout="phone"][data-orientation="portrait"] .tool-grid,
+        [data-layout="phone"][data-orientation="portrait"] .action-grid {
+            display: contents;
+        }
+
+        [data-layout="phone"][data-orientation="portrait"] .tool-btn,
+        [data-layout="phone"][data-orientation="portrait"] .action-btn {
+            width: 44px;
+            height: 44px;
+            order: 2;
+        }
+
+        [data-layout="phone"][data-orientation="portrait"] .paint-tool-btn { order: 1; }
+        [data-layout="phone"][data-orientation="portrait"] #action-lock,
+        [data-layout="phone"][data-orientation="portrait"] #action-unlock { order: 3; }
+        [data-layout="phone"][data-orientation="portrait"] #action-undo,
+        [data-layout="phone"][data-orientation="portrait"] #action-redo { order: 4; }
+        [data-layout="phone"][data-orientation="portrait"] #action-mode,
+        [data-layout="phone"][data-orientation="portrait"] #action-palette { order: 5; }
+
+        [data-layout="phone"][data-orientation="portrait"] .tool-icon {
+            width: 36px;
+            height: 36px;
+        }
+
+        [data-layout="phone"][data-orientation="portrait"] .action-btn img,
+        [data-layout="phone"][data-orientation="portrait"] .action-btn svg {
+            width: 26px;
+            height: 26px;
+        }
+
+        /* Верхние кнопки (?, ≡) - поверх выезжающих панелей, чтобы ≡ работала и при открытой палитре */
+        [data-layout="phone"] .toggle-btn,
+        [data-layout="tablet"] .toggle-btn {
+            z-index: 35;
+        }
+
+        /* У боковых панелей (телефон горизонтально, планшет) крестик слева: справа сверху - кнопка ≡ */
+        [data-layout="phone"][data-orientation="landscape"] #controls .close-panel,
+        [data-layout="phone"][data-orientation="landscape"] #colorPalette .close-panel,
+        [data-layout="tablet"] #controls .close-panel,
+        [data-layout="tablet"] #colorPalette .close-panel {
+            left: 16px;
+            right: auto;
+        }
+
+        [data-layout="phone"] .toolbox-section {
+            display: flex;
+            flex-shrink: 0;
+            margin: 0;
+            padding-right: 6px;
+            border-right: 2px solid #000000;
+        }
+
+        [data-layout="phone"] .toolbox-section:last-child {
+            border-right: none;
+            padding-right: 0;
+        }
+
+        [data-layout="phone"] .toolbox-title {
+            display: none;
+        }
+
+        [data-layout="phone"] .tool-grid,
+        [data-layout="phone"] .action-grid {
+            display: flex;
+            gap: 6px;
+        }
+
+        [data-layout="phone"] .tool-btn,
+        [data-layout="phone"] .action-btn {
+            width: 48px;
+            height: 48px;
+            padding: 2px;
+            flex-shrink: 0;
+        }
+
+        [data-layout="phone"] .tool-icon {
+            width: 40px;
+            height: 40px;
+        }
+
+        [data-layout="phone"] .action-btn img,
+        [data-layout="phone"] .action-btn svg {
+            width: 30px;
+            height: 30px;
+        }
+
+        /* Листы настроек и палитры выезжают снизу, над панелью инструментов:
+           инструменты остаются доступны при открытой палитре */
+        [data-layout="phone"] #controls,
+        [data-layout="phone"] #colorPalette {
+            top: auto;
+            left: 0;
+            right: 0;
+            bottom: var(--toolbar-h);
+            width: auto;
+            max-height: 58vh;
+            max-height: 58dvh;
+            padding: 54px calc(16px + env(safe-area-inset-right)) 16px calc(16px + env(safe-area-inset-left));
+            border-width: 2px 0 0 0;
+            box-shadow: 0 -4px 0 rgba(0, 0, 0, 0.15);
+            transform: none;
+        }
+
+        [data-layout="phone"] #colorPalette:not(.active),
+        [data-layout="phone"] #controls.minimized {
+            transform: translateY(calc(100% + var(--toolbar-h)));
+        }
+
+        /* Телефон горизонтально: листы - справа во всю высоту над панелью */
+        [data-layout="phone"][data-orientation="landscape"] #controls,
+        [data-layout="phone"][data-orientation="landscape"] #colorPalette {
+            top: 0;
+            left: auto;
+            width: min(380px, 55vw);
+            max-height: none;
+            padding-top: calc(54px + env(safe-area-inset-top));
+            border-width: 0 0 0 2px;
+            box-shadow: -4px 0 0 rgba(0, 0, 0, 0.15);
+        }
+
+        [data-layout="phone"][data-orientation="landscape"] #colorPalette:not(.active),
+        [data-layout="phone"][data-orientation="landscape"] #controls.minimized {
+            transform: translateX(calc(100% + 20px));
+        }
+
+        [data-layout="phone"] #controls .close-panel,
+        [data-layout="phone"] #colorPalette .close-panel {
+            top: 6px;
+            right: calc(10px + env(safe-area-inset-right));
+        }
+
+        [data-layout="phone"] h2 {
+            font-size: 18px;
+        }
+
+        /* ---------- Планшет ---------- */
+
+        [data-layout="tablet"] .toggle-btn {
+            width: 48px;
+            height: 48px;
+            font-size: 24px;
+        }
+
+        [data-layout="tablet"] #toggleHints {
+            top: calc(16px + env(safe-area-inset-top));
+            left: calc(16px + env(safe-area-inset-left));
+        }
+
+        [data-layout="tablet"] #toggleControls {
+            top: calc(16px + env(safe-area-inset-top));
+            right: calc(16px + env(safe-area-inset-right));
+        }
+
+        [data-layout="tablet"] .mode-indicator {
+            top: calc(20px + env(safe-area-inset-top));
+        }
+
+        [data-layout="tablet"] #status {
+            left: calc(16px + env(safe-area-inset-left));
+            bottom: calc(16px + env(safe-area-inset-bottom));
+            font-size: 14px;
+        }
+
+        [data-layout="tablet"] .audio-indicator {
+            right: calc(16px + env(safe-area-inset-right));
+            bottom: calc(16px + env(safe-area-inset-bottom));
+        }
+
+        /* Боковая панель инструментов с крупными кнопками */
+        [data-layout="tablet"] #toolbox {
+            left: calc(16px + env(safe-area-inset-left));
+            max-height: calc(100vh - 150px);
+            max-height: calc(100dvh - 150px);
+            padding: 8px;
+        }
+
+        [data-layout="tablet"] .tool-grid,
+        [data-layout="tablet"] .action-grid {
+            gap: 8px;
+        }
+
+        [data-layout="tablet"] .tool-btn,
+        [data-layout="tablet"] .action-btn {
+            width: 64px;
+            height: 64px;
+            padding: 4px;
+        }
+
+        [data-layout="tablet"] .tool-icon {
+            width: 52px;
+            height: 52px;
+        }
+
+        [data-layout="tablet"] .action-btn img,
+        [data-layout="tablet"] .action-btn svg {
+            width: 36px;
+            height: 36px;
+        }
+
+        /* Настройки и палитра - боковые панели справа во всю высоту */
+        [data-layout="tablet"] #controls,
+        [data-layout="tablet"] #colorPalette {
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: auto;
+            width: 360px;
+            max-width: 45vw;
+            max-height: none;
+            padding: calc(52px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) 20px;
+            border-width: 0 0 0 2px;
+            box-shadow: -4px 0 0 rgba(0, 0, 0, 0.15);
+            transform: none;
+        }
+
+        [data-layout="tablet"] #colorPalette:not(.active),
+        [data-layout="tablet"] #controls.minimized {
+            transform: translateX(calc(100% + 20px));
+        }
+
+        [data-layout="tablet"] #controls .close-panel,
+        [data-layout="tablet"] #colorPalette .close-panel {
+            top: calc(8px + env(safe-area-inset-top));
+            right: calc(12px + env(safe-area-inset-right));
         }
     </style>
 </head>
@@ -1219,8 +1452,27 @@
                 </div>
             </div>
 
+            <!-- Edit: undo/redo, mode switch, palette -->
+            <div class="toolbox-section">
+                <div class="toolbox-title">Edit</div>
+                <div class="action-grid">
+                    <button class="action-btn" id="action-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+                    </button>
+                    <button class="action-btn" id="action-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+                    </button>
+                    <button class="action-btn" id="action-mode" title="Editor mode (paint)" aria-label="Editor mode" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4.5-1L20 7.5 16.5 4 5 15.5z"/><path d="m14 6.5 3.5 3.5"/></svg>
+                    </button>
+                    <button class="action-btn" id="action-palette" title="Colors and effects" aria-label="Palette" hidden>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2s-1-1.6-1-2.5 1-1.5 2-1.5h2a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="15" cy="7" r="1.2"/></svg>
+                    </button>
+                </div>
+            </div>
+
             <!-- Paint tools -->
-            <div class="toolbox-section" id="paintToolsSection" style="display: none;">
+            <div class="toolbox-section" id="paintToolsSection" hidden>
                 <div class="toolbox-title">Paint</div>
                 <div class="tool-grid">
                     <button class="tool-btn paint-tool-btn" data-tool="fill" title="Fill molecule with color">
@@ -1238,8 +1490,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="toggle-btn" id="toggleToolbox" title="Show toolbox" style="left: 20px; top: 20px;">≡</div>
 
         <div id="controls">
             <button class="close-panel" id="closeControls" title="Hide panel">×</button>
@@ -1416,7 +1666,6 @@
             </div>
         </div>
 
-        <div class="toggle-btn" id="togglePalette" title="Show palette">▼</div>
 
     </div>
 
@@ -1438,6 +1687,7 @@
 
         // === ПЕРЕМЕННЫЕ ДЛЯ TOUCH УПРАВЛЕНИЯ ===
         let initialPinchDistance = 0; // Для pinch-to-zoom
+        let lastPinchAngle = 0; // Для поворота двумя пальцами
         let touchedMolecule = null; // Молекула которую трогают
 
         // Основные переменные
@@ -2720,6 +2970,28 @@
             targetCtx.lineWidth = stroke.width;
             targetCtx.lineCap = 'round';
             targetCtx.lineJoin = 'round';
+
+            // Штрих стилуса с силой нажатия: у каждой точки своя толщина (w),
+            // поэтому рисуем по сегментам со средней толщиной концов
+            if (stroke.pressure) {
+                let prev = null;
+                for (const point of stroke.points) {
+                    if (point.erased) {
+                        prev = null;
+                        continue;
+                    }
+                    if (prev) {
+                        targetCtx.lineWidth = (prev.w + point.w) / 2;
+                        targetCtx.beginPath();
+                        targetCtx.moveTo(prev.x, prev.y);
+                        targetCtx.lineTo(point.x, point.y);
+                        targetCtx.stroke();
+                    }
+                    prev = point;
+                }
+                return;
+            }
+
             targetCtx.beginPath();
 
             let segmentOpen = false;
@@ -4183,9 +4455,10 @@
 
         function copyStroke(stroke) {
             return {
-                points: stroke.points.map(p => ({ x: p.x, y: p.y, erased: p.erased })),
+                points: stroke.points.map(p => ({ x: p.x, y: p.y, erased: p.erased, w: p.w })),
                 color: stroke.color,
-                width: stroke.width
+                width: stroke.width,
+                pressure: stroke.pressure // Штрих стилуса с переменной толщиной
             };
         }
 
@@ -4209,6 +4482,7 @@
             if (undoHistory.length > MAX_HISTORY_SIZE) {
                 undoHistory.shift(); // Удаляем самое старое состояние
             }
+            updateHistoryButtons();
         }
 
         // Ластик вызывает это перед изменением пикселей области
@@ -4248,6 +4522,7 @@
             restoreState(undoHistory[undoHistory.length - 1]);
 
             statusEl.textContent = `Undone | Remaining: ${undoHistory.length - 1}`;
+            updateHistoryButtons();
         }
 
         // Повтор отменённого действия (Ctrl+Shift+Z / Ctrl+Y)
@@ -4262,6 +4537,7 @@
             restoreState(state);
 
             statusEl.textContent = `Redone | Can redo: ${redoStack.length}`;
+            updateHistoryButtons();
         }
 
         // Инициализация размеров
@@ -4932,7 +5208,22 @@
         let detectHandsStarted = false;
         let sendCount = 0;
         let detectErrorCount = 0;
+
+        // Экономный режим на телефонах и планшетах: распознаём руки не чаще ~20 раз в секунду,
+        // а лицо (детектор открытого рта) - через кадр. Нейросети - основная нагрузка на батарею
+        // и причина нагрева; для жестов 20 кадров в секунду достаточно.
+        const MOBILE_DETECT_INTERVAL_MS = 50;
+        const MOBILE_FACE_EVERY_N = 2;
+        let lastDetectTime = 0;
+
         async function detectHands() {
+            const now = performance.now();
+            if (isMobile && now - lastDetectTime < MOBILE_DETECT_INTERVAL_MS) {
+                requestAnimationFrame(detectHands);
+                return;
+            }
+            lastDetectTime = now;
+
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
                 if (!detectHandsStarted) {
                     console.log('✅ Видео готово, начинаем детекцию рук');
@@ -4960,7 +5251,7 @@
                         await handsDetector.send({ image: video });
                     }
                     // FaceMesh опционально - не блокирует работу рук
-                    if (faceMeshReady && faceMesh) {
+                    if (faceMeshReady && faceMesh && (!isMobile || sendCount % MOBILE_FACE_EVERY_N === 0)) {
                         try {
                             await faceMesh.send({ image: video });
                         } catch {
@@ -5274,26 +5565,28 @@
             window.open('manual.html', '_blank');
         });
 
-        // Скрыть/показать панель управления.
-        // Ставим оба класса: 'minimized' работает на любой ширине, 'mobile-collapsed' даёт
-        // анимацию на узких экранах (раньше на планшетах классы и CSS-брейкпоинт расходились).
+        // === РАСКЛАДКА (phone / tablet / desktop) ===
+        // computeLayout() объявлена в <head>. На телефоне и планшете настройки и палитра -
+        // выезжающие панели, и одновременно открыта только одна из них.
+        let currentLayout = null;
+
+        function isCompactLayout() {
+            return currentLayout === 'phone' || currentLayout === 'tablet';
+        }
+
+        // Скрыть/показать панель настроек
         function setControlsPanelOpen(open) {
             controlsPanel.classList.toggle('minimized', !open);
-            controlsPanel.classList.toggle('mobile-collapsed', !open);
             toggleControlsBtn.classList.toggle('visible', !open);
+            if (open && isCompactLayout()) {
+                setPaletteOpen(false);
+            }
         }
 
         closeControlsBtn.addEventListener('click', () => setControlsPanelOpen(false));
-        toggleControlsBtn.addEventListener('click', () => setControlsPanelOpen(true));
-
-        // === ПАНЕЛЬ ИНСТРУМЕНТОВ ===
-        const toolbox = document.getElementById('toolbox');
-        const toggleToolboxBtn = document.getElementById('toggleToolbox');
-
-        // Показать/скрыть панель инструментов
-        toggleToolboxBtn.addEventListener('click', () => {
-            toolbox.classList.toggle('minimized');
-            toggleToolboxBtn.classList.toggle('visible');
+        // Кнопка ≡ переключает панель (на телефоне она видна и при открытой панели)
+        toggleControlsBtn.addEventListener('click', () => {
+            setControlsPanelOpen(controlsPanel.classList.contains('minimized'));
         });
 
         function setActiveToolButton(activeBtn) {
@@ -5364,28 +5657,22 @@
             }
         });
 
-        // === МОБИЛЬНАЯ АДАПТАЦИЯ ПАНЕЛЕЙ ===
+        // === ПАЛИТРА И КНОПКИ ПАНЕЛИ "EDIT" ===
         const colorPalette = document.getElementById('colorPalette');
-        const togglePaletteBtn = document.getElementById('togglePalette');
         const closePaletteBtn = document.getElementById('closePalette');
+        const actionUndoBtn = document.getElementById('action-undo');
+        const actionRedoBtn = document.getElementById('action-redo');
+        const actionModeBtn = document.getElementById('action-mode');
+        const actionPaletteBtn = document.getElementById('action-palette');
 
-        // Автоматически сворачиваем панель управления на мобильных устройствах при старте
-        if (isMobile) {
-            setControlsPanelOpen(false);
-        }
-
-        // Палитра цветов. Как и у панели управления, ставим оба класса: 'active' показывает палитру
-        // на широких экранах, 'mobile-collapsed' прячет её на узких (CSS-брейкпоинт 768px).
-        // Раньше выбор класса зависел только от isMobile, и на планшете шире 768px палитра
-        // не открывалась вовсе: класс 'active' никогда не добавлялся.
+        // Палитра открывается кнопкой на панели инструментов (на всех раскладках)
         function setPaletteOpen(open) {
             colorPalette.classList.toggle('active', open);
-            colorPalette.classList.toggle('mobile-collapsed', !open);
-            togglePaletteBtn.textContent = open ? '▲' : '▼';
-            togglePaletteBtn.title = open ? 'Hide palette' : 'Show palette';
-            // Кнопка нужна, когда палитру можно открыть: на телефоне - всегда в режиме редактора
-            // (она поверх палитры), на десктопе - только когда палитра закрыта
-            togglePaletteBtn.classList.toggle('visible', editorMode && (isMobile || !open));
+            actionPaletteBtn.classList.toggle('active', open);
+            actionPaletteBtn.setAttribute('aria-pressed', String(open));
+            if (open && isCompactLayout()) {
+                setControlsPanelOpen(false);
+            }
         }
 
         function togglePalette() {
@@ -5393,23 +5680,62 @@
         }
 
         closePaletteBtn.addEventListener('click', () => setPaletteOpen(false));
-        closePaletteBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            setPaletteOpen(false);
-        });
+        actionPaletteBtn.addEventListener('click', togglePalette);
 
-        togglePaletteBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            togglePalette();
-        });
+        actionUndoBtn.addEventListener('click', () => undo());
+        actionRedoBtn.addEventListener('click', () => redo());
+        actionModeBtn.addEventListener('click', () => toggleEditorMode());
 
-        // На тач-устройствах реагируем сразу на касание; preventDefault отменяет последующий click
-        togglePaletteBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            togglePalette();
-        }, { passive: false });
+        // Высота нижней панели на телефоне -> CSS-переменная --toolbar-h: по ней над панелью
+        // располагаются строка статуса и выезжающие листы (панель может занимать 1 или 2 строки)
+        const toolbox = document.getElementById('toolbox');
+        function updateToolbarHeight() {
+            if (currentLayout === 'phone') {
+                document.documentElement.style.setProperty('--toolbar-h', `${toolbox.offsetHeight}px`);
+            } else {
+                document.documentElement.style.removeProperty('--toolbar-h');
+            }
+        }
+        if ('ResizeObserver' in window) {
+            new ResizeObserver(updateToolbarHeight).observe(toolbox);
+        }
+
+        // Состояние кнопок Undo/Redo (вызывается при каждом изменении истории)
+        function updateHistoryButtons() {
+            actionUndoBtn.disabled = undoHistory.length <= 1;
+            actionRedoBtn.disabled = redoStack.length === 0;
+        }
+
+        // Применение раскладки. Вызывается при старте и при изменении размера/ориентации.
+        function updateLayout() {
+            const layout = computeLayout();
+            document.documentElement.dataset.layout = layout;
+            document.documentElement.dataset.orientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+
+            if (layout === currentLayout) {
+                updateToolbarHeight();
+                return;
+            }
+            const isFirstRun = currentLayout === null;
+            currentLayout = layout;
+            updateToolbarHeight();
+
+            if (layout !== 'desktop') {
+                // Позиция, оставшаяся от перетаскивания палитры на десктопе, мешает выезжающей панели
+                colorPalette.style.left = '';
+                colorPalette.style.top = '';
+                colorPalette.style.bottom = '';
+                colorPalette.style.transform = '';
+            }
+
+            // На телефоне/планшете холсту нужно место: настройки при старте и смене раскладки закрыты
+            if (layout !== 'desktop' || (isFirstRun && isMobile)) {
+                setControlsPanelOpen(false);
+            }
+            if (editorMode) {
+                setPaletteOpen(layout !== 'phone');
+            }
+        }
 
         // === PAINT РЕЖИМ РЕДАКТОРА - UI ===
 
@@ -5459,11 +5785,12 @@
                 modeIndicator.textContent = 'Editor mode';
                 modeIndicator.className = 'mode-indicator editor-mode active';
 
-                // Показываем инструменты рисования в режиме редактора
-                document.getElementById('paintToolsSection').style.display = 'block';
+                // Показываем инструменты рисования и кнопку палитры в режиме редактора
+                document.getElementById('paintToolsSection').hidden = false;
+                actionPaletteBtn.hidden = false;
 
-                // На мобильных палитра открывается кнопкой, на десктопе - сразу
-                setPaletteOpen(!isMobile);
+                // На телефоне палитра открывается кнопкой (иначе закрывает полэкрана), на остальных - сразу
+                setPaletteOpen(currentLayout !== 'phone');
 
                 // В редакторе молекулы не обновляются жестами - снимаем "захват" ладонью
                 molecules.forEach(mol => { mol.isGrabbed = false; });
@@ -5476,7 +5803,8 @@
                 modeIndicator.className = 'mode-indicator gesture-mode active';
 
                 // Скрываем инструменты рисования и палитру в режиме жестов
-                document.getElementById('paintToolsSection').style.display = 'none';
+                document.getElementById('paintToolsSection').hidden = true;
+                actionPaletteBtn.hidden = true;
                 setPaletteOpen(false);
 
                 // Инструменты рисования доступны только в редакторе. Раньше после выхода
@@ -5487,6 +5815,11 @@
 
                 statusEl.textContent = 'Gesture mode | Ready';
             }
+
+            // Кнопка режима на панели инструментов
+            actionModeBtn.classList.toggle('active', editorMode);
+            actionModeBtn.setAttribute('aria-pressed', String(editorMode));
+            actionModeBtn.title = editorMode ? 'Back to gesture mode' : 'Editor mode (paint)';
         }
 
         // Обработчик кнопки переключения режима
@@ -6469,6 +6802,85 @@
             }
         });
 
+        // === СТИЛУС (Apple Pencil, перо Wacom/Surface) ===
+        // Перо обрабатывается через Pointer Events. В режиме редактора оно всегда рисует
+        // (кроме выбранных ластика и заливки), толщина линии зависит от силы нажатия.
+        // Пока перо касается экрана и полсекунды после - касания пальцем/ладонью по холсту игнорируются.
+        const PALM_REJECTION_MS = 500;
+        let penActive = false;
+        let penStroke = false;   // Перо рисует карандашом (независимо от выбранного инструмента)
+        let penLastUpTime = -Infinity;
+
+        function penWidth(pressure) {
+            // Некоторые устройства отдают 0, если сила нажатия неизвестна - считаем среднее нажатие
+            const p = pressure > 0 ? pressure : 0.5;
+            return Math.max(1, pencilWidth * (0.3 + p * 1.4));
+        }
+
+        function isPenBlockingTouch() {
+            return penActive || performance.now() - penLastUpTime < PALM_REJECTION_MS;
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            if (e.pointerType !== 'pen' || !editorMode) return;
+            // Отменяет "совместимые" mousedown/mouseup для пера - иначе штрих обработался бы дважды
+            e.preventDefault();
+            penActive = true;
+            canvas.setPointerCapture(e.pointerId);
+
+            const { x, y } = getCanvasPoint(e.clientX, e.clientY);
+            if (currentTool === 'eraser' || currentTool === 'fill') {
+                penStroke = false;
+                paintPointerDown(x, y);
+            } else {
+                penStroke = true;
+                isDrawing = true;
+                currentStroke = {
+                    points: [{ x, y, w: penWidth(e.pressure) }],
+                    color: primaryColor,
+                    width: pencilWidth,
+                    pressure: true
+                };
+            }
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (e.pointerType !== 'pen' || !penActive) return;
+            e.preventDefault();
+            // Промежуточные точки между кадрами: без них быстрые линии пером получаются "ломаными"
+            const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+            for (const ev of (events.length > 0 ? events : [e])) {
+                const { x, y } = getCanvasPoint(ev.clientX, ev.clientY);
+                if (penStroke && currentStroke) {
+                    currentStroke.points.push({ x, y, w: penWidth(ev.pressure) });
+                } else {
+                    paintPointerMove(x, y);
+                }
+            }
+        });
+
+        function finishPen(e) {
+            if (e.pointerType !== 'pen' || !penActive) return;
+            penActive = false;
+            penLastUpTime = performance.now();
+
+            if (penStroke) {
+                penStroke = false;
+                isDrawing = false;
+                if (currentStroke && currentStroke.points.length > 1) {
+                    drawnStrokes.push(currentStroke);
+                    statusEl.textContent = `Drew ${drawnStrokes.length} strokes (pen)`;
+                    saveState();
+                }
+                currentStroke = null;
+            } else {
+                finishPointerAction();
+            }
+        }
+
+        canvas.addEventListener('pointerup', finishPen);
+        canvas.addEventListener('pointercancel', finishPen);
+
         // === TOUCH СОБЫТИЯ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ===
         if (isTouchDevice) {
             let longPressTimer = null;
@@ -6482,8 +6894,14 @@
                 longPressTimer = null;
             };
 
+            // В редакторе касания стилуса обрабатывает Pointer Events, а касания ладонью рядом
+            // с пером - игнорируются (Safari присылает для Apple Pencil ещё и touch-события)
+            const isPenTouch = (e) => editorMode &&
+                (isPenBlockingTouch() || [...e.changedTouches].some(t => t.touchType === 'stylus'));
+
             canvas.addEventListener('touchstart', (e) => {
                 e.preventDefault(); // Предотвращаем скролл и zoom на мобильных
+                if (isPenTouch(e)) return;
 
                 const touches = e.touches;
 
@@ -6553,6 +6971,7 @@
                     const p2 = getCanvasPoint(touches[1].clientX, touches[1].clientY);
 
                     initialPinchDistance = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                    lastPinchAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
                     // Находим молекулу между двумя пальцами (если первый палец уже держит молекулу - её)
                     if (!touchedMolecule) {
@@ -6563,6 +6982,7 @@
 
             canvas.addEventListener('touchmove', (e) => {
                 e.preventDefault();
+                if (isPenTouch(e)) return;
 
                 const touches = e.touches;
 
@@ -6595,6 +7015,17 @@
                     const scaleFactor = currentDistance / initialPinchDistance;
                     initialPinchDistance = currentDistance; // Обновляем для следующего события
 
+                    // Поворот двумя пальцами (как Alt+мышь). Разницу углов приводим к [-π, π],
+                    // чтобы при переходе через ±180° молекула не прокручивалась на полный оборот.
+                    const currentAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                    let angleDelta = currentAngle - lastPinchAngle;
+                    if (angleDelta > Math.PI) angleDelta -= Math.PI * 2;
+                    if (angleDelta < -Math.PI) angleDelta += Math.PI * 2;
+                    lastPinchAngle = currentAngle;
+                    if (!touchedMolecule.isShapeLocked) {
+                        touchedMolecule.deformAngle = (touchedMolecule.deformAngle + angleDelta) % (Math.PI * 2);
+                    }
+
                     // Масштабируем от целевого размера (текущий size отстаёт из-за плавной анимации)
                     const newSize = clampMoleculeSize(touchedMolecule.targetSize * scaleFactor);
                     resizeMolecule(touchedMolecule, newSize);
@@ -6603,12 +7034,13 @@
                     moveMoleculeTo(touchedMolecule, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
                     touchChanged = true;
 
-                    statusEl.textContent = `Size: ${Math.round(newSize)}px (pinch)`;
+                    statusEl.textContent = `Size: ${Math.round(newSize)}px, angle: ${Math.round(touchedMolecule.deformAngle * 180 / Math.PI)}° (two fingers)`;
                 }
             }, { passive: false });
 
             const onTouchEnd = (e) => {
                 e.preventDefault();
+                if (isPenTouch(e) && !isDrawing && !touchedMolecule) return;
 
                 // Завершение рисования
                 if (isDrawing) {
@@ -6650,7 +7082,11 @@
             canvas.style.cursor = getCursorForTool(moleculeTool);
 
             resize();
-            window.addEventListener('resize', resize);
+            updateLayout();
+            window.addEventListener('resize', () => {
+                resize();
+                updateLayout();
+            });
 
             // Сохраняем начальное пустое состояние для возможности отмены первого действия
             saveState();

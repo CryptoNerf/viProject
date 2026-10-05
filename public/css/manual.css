@@ -29,18 +29,23 @@ body.lang-ru .gesture-function {
 .flipbook-container {
     width: 100vw;
     height: 100vh;
+    height: 100dvh; /* Без учёта выезжающей адресной строки мобильных браузеров */
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
 }
 
+/* Отступы сверху/снизу выставляет manual-flip.js (calculateManualBookDimensions): книга центрируется
+   под полосой кнопок, иначе на вертикальных экранах она наезжала на кнопки "назад" и "язык" */
 .book-wrapper {
     display: flex;
     align-items: center;
     justify-content: center;
     width: 100%;
     height: 100%;
+    padding: 72px 0 16px;
+    box-sizing: border-box;
 }
 
 /* Плавное центрирование обложек */
@@ -105,17 +110,20 @@ body.lang-ru .gesture-function {
     transform: translate(2px, 2px);
 }
 
-/* Базовая страница manual */
+/* Базовая страница manual.
+   Все размеры внутри страниц - в em: manual-flip.js подбирает font-size каждой страницы
+   под её размер (fitPagesToSize), и содержимое масштабируется целиком, а не обрезается. */
 .page {
     background: #ffffff;
     color: #000000;
     font-family: 'SysfontC', monospace;
+    font-size: 16px;
 }
 
 .page-inner {
     width: 100%;
     height: 100%;
-    padding: 30px;
+    padding: 1.6em;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -147,30 +155,32 @@ body.lang-ru .gesture-function {
 }
 
 .page-cover h1 {
-    font-size: 48px;
+    font-size: 2.8em;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 20px;
-    border-bottom: 4px solid #ffffff;
-    padding-bottom: 20px;
+    margin: 0 0 0.4em;
+    border-bottom: 0.08em solid #ffffff;
+    padding-bottom: 0.4em;
 }
 
 .page-cover .subtitle {
-    font-size: 24px;
+    font-size: 1.5em;
     text-transform: uppercase;
-    margin: 20px 0;
+    margin: 0.8em 0;
 }
 
 .page-cover .author {
-    font-size: 20px;
+    font-size: 1.25em;
     text-transform: uppercase;
-    margin-top: 20px;
+    margin-top: 1em;
 }
 
 .cover-image {
-    max-width: 200px;
-    max-height: 400px;
-    margin: 30px auto 0;
+    max-width: 60%;
+    min-height: 0;
+    flex: 0 1 auto;
+    max-height: 22em;
+    margin: 1.8em auto 0;
     object-fit: contain;
     display: block;
 }
@@ -182,67 +192,92 @@ body.lang-ru .gesture-function {
 }
 
 .page-cover-back h1 {
-    font-size: 36px;
+    font-size: 2.2em;
 }
 
 .page-cover-back .subtitle {
-    margin-top: 20px;
-    font-size: 18px;
+    margin-top: 1.1em;
+    font-size: 1.1em;
 }
 
 /* Внутренние страницы */
 .page h2 {
-    font-size: 20px;
+    font-size: 1.25em;
     text-transform: uppercase;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
+    margin: 0 0 0.6em;
+    padding-bottom: 0.4em;
     border-bottom: 2px solid #000000;
     flex-shrink: 0;
 }
 
+/* Текст страниц "Welcome" и "That's all" */
+.page-text {
+    font-size: 1.125em;
+    line-height: 1.8;
+    text-align: left;
+    flex-shrink: 0;
+}
+
+/* Страница с клавиатурными сокращениями */
+.page-text-keys {
+    font-size: 1.15em;
+    line-height: 1.9;
+}
+
 .gesture-description {
-    font-size: 16px;
+    font-size: 1em;
     line-height: 1.6;
-    margin-bottom: 10px;
+    margin-bottom: 0.6em;
     flex-shrink: 0;
 }
 
 .gesture-description strong {
     display: block;
-    margin-bottom: 3px;
+    margin-bottom: 0.2em;
 }
 
 .gesture-function {
-    font-size: 16px;
+    font-size: 1em;
     font-weight: bold;
-    margin: 8px 0;
-    padding: 10px;
+    margin: 0.5em 0;
+    padding: 0.6em;
     background: #f0f0f0;
     border: 2px solid #000000;
     text-align: center;
     flex-shrink: 0;
 }
 
+/* Картинка занимает оставшееся место страницы, но не меньше min-height */
 .gesture-image {
     flex: 1;
-    margin-top: 10px;
+    margin-top: 0.6em;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #f9f9f9;
     border: 2px solid #000000;
-    min-height: 150px;
-    max-height: 100%;
+    min-height: 7em;
     color: #999999;
-    font-size: 12px;
-    padding: 8px;
+    font-size: 0.75em;
+    padding: 0.5em;
     overflow: hidden;
 }
 
 .gesture-image img {
     max-width: 100%;
     max-height: 100%;
+    min-height: 0;
     object-fit: contain;
+}
+
+/* Страница не помещается даже с мелким шрифтом: без иллюстрации, затем с прокруткой */
+.page-compact .gesture-image,
+.page-compact .cover-image {
+    display: none;
+}
+
+.page-scroll .page-content {
+    overflow-y: auto;
 }
 
 /* Ссылки в тексте */
@@ -258,66 +293,12 @@ body.lang-ru .gesture-function {
     color: #ffffff;
 }
 
-/* Responsive */
+/* Responsive: размеры страниц подгоняет JS, здесь - только кнопки */
 @media (max-width: 768px) {
-    .back-button {
-        padding: 8px 12px;
-        font-size: 14px;
-    }
-
+    .back-button,
     .lang-button {
         padding: 8px 12px;
         font-size: 14px;
-    }
-
-    .page-inner {
-        padding: 20px;
-    }
-
-    .page-cover h1 {
-        font-size: 28px;
-        padding-bottom: 12px;
-        margin-bottom: 12px;
-    }
-
-    .page-cover .subtitle {
-        font-size: 16px;
-        margin: 12px 0;
-    }
-
-    .page-cover .author {
-        font-size: 14px;
-        margin-top: 12px;
-    }
-
-    .cover-image {
-        max-width: 150px;
-        max-height: 150px;
-        margin: 20px auto 0;
-    }
-
-    .page h2 {
-        font-size: 16px;
-        margin-bottom: 10px;
-        padding-bottom: 6px;
-    }
-
-    .gesture-description {
-        font-size: 14px;
-        line-height: 1.5;
-        margin-bottom: 8px;
-    }
-
-    .gesture-function {
-        font-size: 14px;
-        padding: 8px;
-        margin: 6px 0;
-    }
-
-    .gesture-image {
-        min-height: 120px;
-        margin-top: 8px;
-        padding: 6px;
     }
 }
 
@@ -334,65 +315,5 @@ body.lang-ru .gesture-function {
         font-size: 12px;
         top: 10px;
         right: 10px;
-    }
-
-    .page-inner {
-        padding: 15px;
-    }
-
-    .page-cover h1 {
-        font-size: 22px;
-        padding-bottom: 10px;
-        margin-bottom: 10px;
-        border-bottom-width: 3px;
-    }
-
-    .page-cover .subtitle {
-        font-size: 14px;
-        margin: 10px 0;
-    }
-
-    .page-cover .author {
-        font-size: 12px;
-        margin-top: 10px;
-    }
-
-    .cover-image {
-        max-width: 120px;
-        max-height: 120px;
-        margin: 15px auto 0;
-    }
-
-    .page-cover-back h1 {
-        font-size: 22px;
-    }
-
-    .page-cover-back .subtitle {
-        font-size: 12px;
-    }
-
-    .page h2 {
-        font-size: 14px;
-        margin-bottom: 8px;
-        padding-bottom: 5px;
-    }
-
-    .gesture-description {
-        font-size: 13px;
-        line-height: 1.4;
-        margin-bottom: 6px;
-    }
-
-    .gesture-function {
-        font-size: 13px;
-        padding: 6px;
-        margin: 5px 0;
-    }
-
-    .gesture-image {
-        min-height: 80px;
-        font-size: 10px;
-        margin-top: 6px;
-        padding: 5px;
     }
 }
